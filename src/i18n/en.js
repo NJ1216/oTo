@@ -77,7 +77,7 @@ export default {
   about: {
     subtitle: 'Audio Converter',
     loading: 'Loading…',
-    libs: 'Libraries / Licenses',
+    libs: 'Libraries',
     close: 'Close',
   },
 };

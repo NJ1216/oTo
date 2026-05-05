@@ -2,42 +2,51 @@ import { initI18n } from '../i18n/index.js';
 
 const { invoke } = window.__TAURI__.core;
 
-const LICENSES = `\
-Tauri
-  Version: 2.x
-  License: MIT / Apache-2.0
-  https://tauri.app
+const BADGE_CLASS = {
+  'MIT':        'badge-mit',
+  'LGPL 2.1+':  'badge-lgpl',
+  'Apache-2.0': 'badge-apache',
+};
 
-FFmpeg
-  Version: 8.x (system)
-  License: LGPL 2.1+
-  https://ffmpeg.org
+const LIBS = [
+  { name: 'tauri',           license: 'MIT',       url: 'https://tauri.app' },
+  { name: 'FFmpeg',          license: 'LGPL 2.1+', url: 'https://ffmpeg.org' },
+  { name: 'tokio',           license: 'MIT',       url: 'https://tokio.rs' },
+  { name: 'serde',           license: 'MIT',       url: 'https://serde.rs' },
+  { name: 'walkdir',         license: 'MIT',       url: 'https://github.com/BurntSushi/walkdir' },
+  { name: 'uuid',            license: 'MIT',       url: 'https://github.com/uuid-rs/uuid' },
+  { name: 'anyhow',          license: 'MIT',       url: 'https://github.com/dtolnay/anyhow' },
+  { name: 'dirs',            license: 'MIT',       url: 'https://github.com/dirs-dev/dirs-rs' },
+  { section: 'JavaScript (フロントエンド)' },
+  { name: '@tauri-apps/api', license: 'MIT',       url: 'https://tauri.app' },
+];
 
-tokio
-  Version: 1.x
-  License: MIT
-  https://tokio.rs
+function buildLibList() {
+  const container = document.getElementById('lib-list');
+  for (const item of LIBS) {
+    if (item.section) {
+      const el = document.createElement('div');
+      el.className = 'lib-section-header';
+      el.textContent = item.section;
+      container.appendChild(el);
+    } else {
+      const row = document.createElement('div');
+      row.className = 'lib-row';
 
-serde / serde_json
-  Version: 1.x
-  License: MIT / Apache-2.0
-  https://serde.rs
+      const name = document.createElement('span');
+      name.className = 'lib-name';
+      name.textContent = item.name;
 
-walkdir
-  Version: 2.x
-  License: MIT / Unlicense
-  https://github.com/BurntSushi/walkdir
+      const badge = document.createElement('span');
+      badge.className = 'lib-badge ' + (BADGE_CLASS[item.license] ?? 'badge-other');
+      badge.textContent = item.license;
 
-uuid
-  Version: 1.x
-  License: MIT / Apache-2.0
-  https://github.com/uuid-rs/uuid
-
-anyhow
-  Version: 1.x
-  License: MIT / Apache-2.0
-  https://github.com/dtolnay/anyhow
-`;
+      row.appendChild(name);
+      row.appendChild(badge);
+      container.appendChild(row);
+    }
+  }
+}
 
 async function init() {
   let lang = '';
@@ -47,10 +56,10 @@ async function init() {
   } catch (_) {}
 
   await initI18n(lang);
+  buildLibList();
 
   const version = await invoke('get_app_version');
   document.getElementById('version-text').textContent = version;
-  document.getElementById('licenses').value = LICENSES;
 }
 
 document.getElementById('close-btn').addEventListener('click', () => {

@@ -77,7 +77,7 @@ export default {
   about: {
     subtitle: '音声変換ツール',
     loading: '読み込み中…',
-    libs: '使用ライブラリ / ライセンス',
+    libs: '使用ライブラリ',
     close: '閉じる',
   },
 };
