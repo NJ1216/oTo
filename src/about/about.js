@@ -9,6 +9,8 @@ const BADGE_CLASS = {
 };
 
 const LIBS = [
+  { name: 'oTo',             license: 'MIT',       url: 'https://github.com/' },
+  { section: 'Rust（バックエンド）' },
   { name: 'tauri',           license: 'MIT',       url: 'https://tauri.app' },
   { name: 'FFmpeg',          license: 'LGPL 2.1+', url: 'https://ffmpeg.org' },
   { name: 'tokio',           license: 'MIT',       url: 'https://tokio.rs' },
@@ -17,7 +19,7 @@ const LIBS = [
   { name: 'uuid',            license: 'MIT',       url: 'https://github.com/uuid-rs/uuid' },
   { name: 'anyhow',          license: 'MIT',       url: 'https://github.com/dtolnay/anyhow' },
   { name: 'dirs',            license: 'MIT',       url: 'https://github.com/dirs-dev/dirs-rs' },
-  { section: 'JavaScript (フロントエンド)' },
+  { section: 'JavaScript（フロントエンド）' },
   { name: '@tauri-apps/api', license: 'MIT',       url: 'https://tauri.app' },
 ];
 
