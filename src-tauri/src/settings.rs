@@ -41,6 +41,8 @@ pub struct Settings {
     pub last_mode: String,
     pub last_format: String,
     pub custom_output_path: Option<String>,
+    #[serde(default)]
+    pub language: String,
 }
 
 impl Default for Settings {
@@ -60,6 +62,7 @@ impl Default for Settings {
             last_mode: "encode".into(),
             last_format: "mp3".into(),
             custom_output_path: None,
+            language: String::new(),
         }
     }
 }

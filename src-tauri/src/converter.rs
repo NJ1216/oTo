@@ -16,6 +16,8 @@ const SUPPORTED_EXTS: &[&str] = &[
     "wav", "mp3", "m4a", "aac", "flac", "mp4", "ogg", "opus", "wma", "aiff", "aif", "alac",
 ];
 
+const MAX_FILE_SIZE: u64 = 10 * 1024 * 1024 * 1024; // 10 GiB
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ConvertRequest {
@@ -282,21 +284,20 @@ async fn convert_one(
         "-map_metadata".into(),
         "0".into(),
         "-map".into(),
-        "0:a".into(),  // 音声ストリームを明示選択
+        "0:a".into(),
     ];
 
     // カバーアート（埋め込み画像）の引き継ぎ
     // WAVはコンテナ仕様上カバーアート非対応。他フォーマットは画像ストリームをそのままコピーして埋め込む。
     // -c:v copy でJPEGを再エンコードせずに保持し、attached_pic でカバーアートとしてマーク。
-    // これにより以前の "mjpeg → H.264変換しようとしてipodコンテナで失敗" が起きなくなる。
     if format != "wav" {
         args.extend([
             "-map".into(),
-            "0:v?".into(),              // 画像ストリームがあれば含める（なければ無視）
+            "0:v?".into(),
             "-c:v".into(),
-            "copy".into(),              // JPEG画像を再エンコードせずコピー
+            "copy".into(),
             "-disposition:v:0".into(),
-            "attached_pic".into(),      // カバーアートとしてマーク
+            "attached_pic".into(),
         ]);
     }
 
@@ -322,7 +323,6 @@ async fn convert_one(
         .spawn()
         .map_err(|e| anyhow!("failed to spawn ffmpeg: {}", e))?;
 
-    // stderrを別タスクで収集（エラー時のメッセージ用）
     let stderr_task = child.stderr.take().map(|stderr| {
         tokio::spawn(async move {
             let mut lines = BufReader::new(stderr).lines();
@@ -354,7 +354,6 @@ async fn convert_one(
     };
 
     if !status.success() {
-        // stderrの末尾20行を返す（FFmpegは末尾に最重要なエラーを出力する）
         let tail: String = stderr_text
             .lines()
             .filter(|l| !l.trim().is_empty())
@@ -390,10 +389,9 @@ pub async fn run_conversion(
     };
 
     // Collect files
-    let file_paths = collect_audio_files(&request.paths);
-    let file_count = file_paths.len();
+    let all_paths = collect_audio_files(&request.paths);
 
-    if file_count == 0 {
+    if all_paths.is_empty() {
         let _ = app.emit(
             "conversion_complete",
             CompletionPayload {
@@ -406,10 +404,59 @@ pub async fn run_conversion(
         return;
     }
 
-    // Probe all files for duration, tags, stream info
+    // Reject files exceeding 10 GiB
+    let mut skip_results: Vec<FileResult> = Vec::new();
+    let mut file_paths: Vec<PathBuf> = Vec::new();
+    for path in all_paths {
+        match std::fs::metadata(&path) {
+            Ok(meta) if meta.len() > MAX_FILE_SIZE => {
+                skip_results.push(FileResult {
+                    input_path: path.to_string_lossy().into(),
+                    output_path: String::new(),
+                    success: false,
+                    error: Some(format!(
+                        "File size exceeds 10 GiB limit ({:.1} GiB)",
+                        meta.len() as f64 / 1_073_741_824.0
+                    )),
+                });
+            }
+            _ => file_paths.push(path),
+        }
+    }
+
+    let file_count = file_paths.len();
+
+    if file_count == 0 {
+        let error_count = skip_results.len();
+        let _ = app.emit(
+            "conversion_complete",
+            CompletionPayload {
+                job_id,
+                results: skip_results,
+                success_count: 0,
+                error_count,
+            },
+        );
+        return;
+    }
+
+    // Probe all files in parallel (order preserved via indexed join)
+    let probe_handles: Vec<_> = file_paths
+        .iter()
+        .map(|p| {
+            let path = p.clone();
+            tokio::spawn(async move { probe_file(&path).await })
+        })
+        .collect();
+
     let mut file_infos: Vec<FileInfo> = Vec::with_capacity(file_count);
-    for path in &file_paths {
-        file_infos.push(probe_file(path).await);
+    for h in probe_handles {
+        file_infos.push(h.await.unwrap_or_else(|_| FileInfo {
+            path: PathBuf::new(),
+            duration_secs: 0.0,
+            tags: HashMap::new(),
+            bits_per_sample: 16,
+        }));
     }
 
     let total_duration: f64 = file_infos.iter().map(|i| i.duration_secs).sum::<f64>().max(1.0);
@@ -511,7 +558,7 @@ pub async fn run_conversion(
         });
     }
 
-    let mut results = Vec::with_capacity(file_count);
+    let mut results: Vec<FileResult> = skip_results;
     while let Some(res) = join_set.join_next().await {
         match res {
             Ok(r) => results.push(r),

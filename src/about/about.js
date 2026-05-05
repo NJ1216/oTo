@@ -1,3 +1,5 @@
+import { initI18n } from '../i18n/index.js';
+
 const { invoke } = window.__TAURI__.core;
 
 const LICENSES = `\
@@ -38,6 +40,14 @@ anyhow
 `;
 
 async function init() {
+  let lang = '';
+  try {
+    const settings = await invoke('get_settings');
+    lang = settings.language || '';
+  } catch (_) {}
+
+  await initI18n(lang);
+
   const version = await invoke('get_app_version');
   document.getElementById('version-text').textContent = version;
   document.getElementById('licenses').value = LICENSES;

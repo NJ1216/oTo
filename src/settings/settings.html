@@ -8,18 +8,18 @@
 </head>
 <body>
   <div id="app">
-    <h1>設定</h1>
+    <h1 data-i18n="settings.title">設定</h1>
 
     <!-- 出力先 -->
     <section class="section">
-      <h2>出力先フォルダ</h2>
+      <h2 data-i18n="settings.output.title">出力先フォルダ</h2>
       <div class="radio-group">
-        <label><input type="radio" name="outputDest" value="source_folder" /> 元ファイルと同じフォルダ</label>
-        <label><input type="radio" name="outputDest" value="desktop" /> デスクトップ</label>
-        <label><input type="radio" name="outputDest" value="downloads" /> ダウンロード</label>
+        <label><input type="radio" name="outputDest" value="source_folder" /> <span data-i18n="settings.output.source">元ファイルと同じフォルダ</span></label>
+        <label><input type="radio" name="outputDest" value="desktop" /> <span data-i18n="settings.output.desktop">デスクトップ</span></label>
+        <label><input type="radio" name="outputDest" value="downloads" /> <span data-i18n="settings.output.downloads">ダウンロード</span></label>
         <label class="custom-row">
-          <input type="radio" name="outputDest" value="custom" /> 指定フォルダ
-          <button id="pick-folder-btn" class="small-btn">選択…</button>
+          <input type="radio" name="outputDest" value="custom" /> <span data-i18n="settings.output.custom">指定フォルダ</span>
+          <button id="pick-folder-btn" class="small-btn" data-i18n="settings.output.pick">選択…</button>
         </label>
       </div>
       <div id="custom-path-display" class="path-display"></div>
@@ -27,54 +27,54 @@
 
     <!-- 元ファイルの扱い -->
     <section class="section">
-      <h2>元ファイルの扱い</h2>
+      <h2 data-i18n="settings.source.title">元ファイルの扱い</h2>
       <div class="radio-group">
-        <label><input type="radio" name="sourceAction" value="keep" /> 保持（デフォルト）</label>
-        <label><input type="radio" name="sourceAction" value="delete" /> 変換後に削除</label>
+        <label><input type="radio" name="sourceAction" value="keep" /> <span data-i18n="settings.source.keep">保持（デフォルト）</span></label>
+        <label><input type="radio" name="sourceAction" value="delete" /> <span data-i18n="settings.source.delete">変換後に削除</span></label>
       </div>
     </section>
 
     <!-- 同名ファイル競合 -->
     <section class="section">
-      <h2>同名ファイルの競合処理</h2>
+      <h2 data-i18n="settings.conflict.title">同名ファイルの競合処理</h2>
       <div class="radio-group">
-        <label><input type="radio" name="nameConflict" value="auto_rename" /> 自動リネーム（デフォルト）</label>
-        <label><input type="radio" name="nameConflict" value="confirm_dialog" /> 上書き確認</label>
-        <label><input type="radio" name="nameConflict" value="force_overwrite" /> 強制上書き</label>
+        <label><input type="radio" name="nameConflict" value="auto_rename" /> <span data-i18n="settings.conflict.rename">自動リネーム（デフォルト）</span></label>
+        <label><input type="radio" name="nameConflict" value="confirm_dialog" /> <span data-i18n="settings.conflict.confirm">上書き確認</span></label>
+        <label><input type="radio" name="nameConflict" value="force_overwrite" /> <span data-i18n="settings.conflict.overwrite">強制上書き</span></label>
       </div>
     </section>
 
     <!-- 変換品質 -->
     <section class="section">
-      <h2>変換品質</h2>
+      <h2 data-i18n="settings.quality.title">変換品質</h2>
       <div class="quality-grid">
-        <label>MP3 ビットレート</label>
+        <label data-i18n="settings.quality.mp3.label">MP3 ビットレート</label>
         <div class="select-wrap">
           <select id="mp3Bitrate">
-            <option value="128">128 kbps</option>
-            <option value="192">192 kbps（デフォルト）</option>
-            <option value="256">256 kbps</option>
-            <option value="320">320 kbps</option>
+            <option value="128" data-i18n="settings.quality.mp3.128">128 kbps</option>
+            <option value="192" data-i18n="settings.quality.mp3.192">192 kbps（デフォルト）</option>
+            <option value="256" data-i18n="settings.quality.mp3.256">256 kbps</option>
+            <option value="320" data-i18n="settings.quality.mp3.320">320 kbps</option>
           </select>
         </div>
 
-        <label>M4A ビットレート</label>
+        <label data-i18n="settings.quality.m4a.label">M4A ビットレート</label>
         <div class="select-wrap">
           <select id="m4aBitrate">
-            <option value="96">96 kbps</option>
-            <option value="128">128 kbps（デフォルト）</option>
-            <option value="192">192 kbps</option>
-            <option value="256">256 kbps</option>
+            <option value="96" data-i18n="settings.quality.m4a.96">96 kbps</option>
+            <option value="128" data-i18n="settings.quality.m4a.128">128 kbps（デフォルト）</option>
+            <option value="192" data-i18n="settings.quality.m4a.192">192 kbps</option>
+            <option value="256" data-i18n="settings.quality.m4a.256">256 kbps</option>
           </select>
         </div>
 
-        <label>FLAC 圧縮レベル</label>
+        <label data-i18n="settings.quality.flac.label">FLAC 圧縮レベル</label>
         <div class="select-wrap">
           <select id="flacCompression">
-            <option value="0">0（最速）</option>
-            <option value="3">3</option>
-            <option value="5">5（デフォルト）</option>
-            <option value="8">8（最高圧縮）</option>
+            <option value="0" data-i18n="settings.quality.flac.0">0（最速）</option>
+            <option value="3" data-i18n="settings.quality.flac.3">3</option>
+            <option value="5" data-i18n="settings.quality.flac.5">5（デフォルト）</option>
+            <option value="8" data-i18n="settings.quality.flac.8">8（最高圧縮）</option>
           </select>
         </div>
       </div>
@@ -82,25 +82,37 @@
 
     <!-- 並列変換 -->
     <section class="section">
-      <h2>並列変換</h2>
+      <h2 data-i18n="settings.parallel.title">並列変換</h2>
       <div class="row">
-        <label for="parallelCount">同時実行数</label>
+        <label for="parallelCount" data-i18n="settings.parallel.count">同時実行数</label>
         <input type="number" id="parallelCount" min="1" max="16" value="2" />
       </div>
     </section>
 
     <!-- その他 -->
     <section class="section">
-      <h2>その他</h2>
+      <h2 data-i18n="settings.misc.title">その他</h2>
       <label class="checkbox-row">
         <input type="checkbox" id="openInFinder" />
-        変換完了後にFinderで表示
+        <span data-i18n="settings.misc.reveal">変換完了後に出力先を開く</span>
       </label>
     </section>
 
+    <!-- 言語 -->
+    <section class="section">
+      <h2 data-i18n="settings.lang.title">言語</h2>
+      <div class="select-wrap">
+        <select id="language">
+          <option value="" data-i18n="settings.lang.auto">システム設定に従う</option>
+          <option value="ja">日本語</option>
+          <option value="en">English</option>
+        </select>
+      </div>
+    </section>
+
     <div id="actions">
-      <button id="cancel-btn" class="btn secondary">キャンセル</button>
-      <button id="save-btn" class="btn primary">保存</button>
+      <button id="cancel-btn" class="btn secondary" data-i18n="settings.cancel">キャンセル</button>
+      <button id="save-btn" class="btn primary" data-i18n="settings.save">保存</button>
     </div>
   </div>
 

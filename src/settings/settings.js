@@ -1,5 +1,6 @@
+import { initI18n } from '../i18n/index.js';
+
 const { invoke } = window.__TAURI__.core;
-const { emit, getCurrentWindow } = window.__TAURI__;
 
 let settings = null;
 let customPath = null;
@@ -7,6 +8,7 @@ let customPath = null;
 async function init() {
   settings = await invoke('get_settings');
   customPath = settings.customOutputPath || null;
+  await initI18n(settings.language || '');
   populateForm(settings);
 }
 
@@ -37,11 +39,12 @@ function populateForm(s) {
 
   // Open in Finder
   document.getElementById('openInFinder').checked = s.openInFinder;
+
+  // Language
+  document.getElementById('language').value = s.language || '';
 }
 
 function snakeCase(val) {
-  // Convert camelCase enum variant string to snake_case if needed
-  // e.g. "sourceFolder" -> "source_folder", "autoRename" -> "auto_rename"
   return val.replace(/([A-Z])/g, (m) => '_' + m.toLowerCase());
 }
 
@@ -61,6 +64,11 @@ document.getElementById('pick-folder-btn').addEventListener('click', async () =>
   }
 });
 
+// Language real-time preview
+document.getElementById('language').addEventListener('change', (e) => {
+  initI18n(e.target.value);
+});
+
 // Save
 document.getElementById('save-btn').addEventListener('click', async () => {
   const outputDest = document.querySelector('input[name="outputDest"]:checked')?.value;
@@ -78,6 +86,7 @@ document.getElementById('save-btn').addEventListener('click', async () => {
     parallelCount: Math.max(1, parseInt(document.getElementById('parallelCount').value, 10) || 1),
     openInFinder: document.getElementById('openInFinder').checked,
     customOutputPath: customPath,
+    language: document.getElementById('language').value,
   };
 
   await invoke('save_settings', { s: updated });
@@ -85,8 +94,9 @@ document.getElementById('save-btn').addEventListener('click', async () => {
   await window.__TAURI__.webviewWindow.getCurrentWebviewWindow().close();
 });
 
-// Cancel
+// Cancel — restore saved language before closing
 document.getElementById('cancel-btn').addEventListener('click', async () => {
+  if (settings) await initI18n(settings.language || '');
   await window.__TAURI__.webviewWindow.getCurrentWebviewWindow().close();
 });
 

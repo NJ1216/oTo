@@ -1,4 +1,5 @@
 import { initSVGController, setState, setFormat, setMode, setProgress } from './svg-controller.js';
+import { initI18n, t } from './i18n/index.js';
 
 const { invoke } = window.__TAURI__.core;
 const { listen } = window.__TAURI__.event;
@@ -27,8 +28,11 @@ async function init() {
     appSettings = {
       lastMode: 'encode',
       lastFormat: 'mp3',
+      language: '',
     };
   }
+
+  await initI18n(appSettings.language || '');
 
   currentMode = appSettings.lastMode || 'encode';
   currentFormat = appSettings.lastFormat || 'mp3';
@@ -62,6 +66,7 @@ async function init() {
   // Listen for settings update from settings window
   await listen('settings_updated', async () => {
     appSettings = await invoke('get_settings');
+    await initI18n(appSettings.language || '');
   });
 }
 
@@ -163,7 +168,7 @@ async function startConversion(paths) {
     isProcessing = false;
     activeJobId = null;
     setState('standby');
-    showToast(`エラー: ${e}`, 'error');
+    showToast(t('toast.error', { msg: e }), 'error');
   }
 }
 
@@ -171,21 +176,22 @@ async function startConversion(paths) {
 function showCompletionToast(successCount, errorCount, results) {
   if (errorCount === 0) {
     showToast(
-      successCount === 1 ? `変換完了 (1ファイル)` : `変換完了 (${successCount}ファイル)`,
+      successCount === 1
+        ? t('toast.done.one')
+        : t('toast.done.many', { n: successCount }),
       'success'
     );
     return;
   }
 
-  // 失敗したファイルのエラーをコンソールに全文出力
   results?.filter((r) => !r.success).forEach((r) => {
     console.error(`[oTo] 変換失敗: ${r.inputPath}\n${r.error}`);
   });
 
   if (successCount === 0) {
-    showToast(`変換失敗 (${errorCount}件) — 詳細はDevToolsで確認`, 'error');
+    showToast(t('toast.fail.all', { n: errorCount }), 'error');
   } else {
-    showToast(`${successCount}件成功 / ${errorCount}件失敗 — DevToolsで詳細確認`, 'warning');
+    showToast(t('toast.fail.partial', { ok: successCount, err: errorCount }), 'warning');
   }
 }
 
@@ -238,7 +244,6 @@ function hideContextMenu() {
 
 // --- Misc event listeners ---
 function registerEventListeners() {
-  // Keyboard: Esc hides context menu
   document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') hideContextMenu();
   });
