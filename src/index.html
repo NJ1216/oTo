@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>oTo</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <!-- SVG background (filled by svg-controller.js) -->
+  <div id="bg-container"></div>
+
+  <!-- UI overlay -->
+  <div id="ui-overlay">
+    <!-- Format selector (encode mode only) -->
+    <div id="format-selector">
+      <button class="fmt-btn active" data-fmt="mp3">MP3</button>
+      <button class="fmt-btn" data-fmt="m4a">M4A</button>
+      <button class="fmt-btn" data-fmt="flac">FLAC</button>
+    </div>
+
+    <!-- Mode toggle: encode / decode -->
+    <div id="toggle-area">
+      <span class="toggle-label">ENCODE</span>
+      <label class="toggle-switch">
+        <input type="checkbox" id="mode-toggle" />
+        <span class="slider"></span>
+      </label>
+      <span class="toggle-label">DECODE</span>
+    </div>
+  </div>
+
+  <!-- Context menu -->
+  <div id="context-menu">
+    <div class="menu-item" id="menu-settings">設定</div>
+    <div class="menu-separator"></div>
+    <div class="menu-item" id="menu-about">バージョン情報</div>
+  </div>
+
+  <!-- Toast notification -->
+  <div id="toast" class="toast"></div>
+
+  <script type="module" src="main.js"></script>
+</body>
+</html>

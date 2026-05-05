@@ -1,0 +1,30 @@
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Claude Code
+.claude/
+
+# Private docs
+doc/
+
+# Node.js
+node_modules/
+
+# Rust / Tauri build output
+src-tauri/target/
+
+# Sidecar binaries (platform-specific executables)
+src-tauri/binaries/
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# Editor
+.vscode/
+.idea/
+*.swp
+*.swo

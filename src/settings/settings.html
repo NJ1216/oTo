@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>設定</title>
+  <link rel="stylesheet" href="settings.css" />
+</head>
+<body>
+  <div id="app">
+    <h1>設定</h1>
+
+    <!-- 出力先 -->
+    <section class="section">
+      <h2>出力先フォルダ</h2>
+      <div class="radio-group">
+        <label><input type="radio" name="outputDest" value="source_folder" /> 元ファイルと同じフォルダ</label>
+        <label><input type="radio" name="outputDest" value="desktop" /> デスクトップ</label>
+        <label><input type="radio" name="outputDest" value="downloads" /> ダウンロード</label>
+        <label class="custom-row">
+          <input type="radio" name="outputDest" value="custom" /> 指定フォルダ
+          <button id="pick-folder-btn" class="small-btn">選択…</button>
+        </label>
+      </div>
+      <div id="custom-path-display" class="path-display"></div>
+    </section>
+
+    <!-- 元ファイルの扱い -->
+    <section class="section">
+      <h2>元ファイルの扱い</h2>
+      <div class="radio-group">
+        <label><input type="radio" name="sourceAction" value="keep" /> 保持（デフォルト）</label>
+        <label><input type="radio" name="sourceAction" value="delete" /> 変換後に削除</label>
+      </div>
+    </section>
+
+    <!-- 同名ファイル競合 -->
+    <section class="section">
+      <h2>同名ファイルの競合処理</h2>
+      <div class="radio-group">
+        <label><input type="radio" name="nameConflict" value="auto_rename" /> 自動リネーム（デフォルト）</label>
+        <label><input type="radio" name="nameConflict" value="confirm_dialog" /> 上書き確認</label>
+        <label><input type="radio" name="nameConflict" value="force_overwrite" /> 強制上書き</label>
+      </div>
+    </section>
+
+    <!-- 変換品質 -->
+    <section class="section">
+      <h2>変換品質</h2>
+      <div class="quality-grid">
+        <label>MP3 ビットレート</label>
+        <div class="select-wrap">
+          <select id="mp3Bitrate">
+            <option value="128">128 kbps</option>
+            <option value="192">192 kbps（デフォルト）</option>
+            <option value="256">256 kbps</option>
+            <option value="320">320 kbps</option>
+          </select>
+        </div>
+
+        <label>M4A ビットレート</label>
+        <div class="select-wrap">
+          <select id="m4aBitrate">
+            <option value="96">96 kbps</option>
+            <option value="128">128 kbps（デフォルト）</option>
+            <option value="192">192 kbps</option>
+            <option value="256">256 kbps</option>
+          </select>
+        </div>
+
+        <label>FLAC 圧縮レベル</label>
+        <div class="select-wrap">
+          <select id="flacCompression">
+            <option value="0">0（最速）</option>
+            <option value="3">3</option>
+            <option value="5">5（デフォルト）</option>
+            <option value="8">8（最高圧縮）</option>
+          </select>
+        </div>
+      </div>
+    </section>
+
+    <!-- 並列変換 -->
+    <section class="section">
+      <h2>並列変換</h2>
+      <div class="row">
+        <label for="parallelCount">同時実行数</label>
+        <input type="number" id="parallelCount" min="1" max="16" value="2" />
+      </div>
+    </section>
+
+    <!-- その他 -->
+    <section class="section">
+      <h2>その他</h2>
+      <label class="checkbox-row">
+        <input type="checkbox" id="openInFinder" />
+        変換完了後にFinderで表示
+      </label>
+    </section>
+
+    <div id="actions">
+      <button id="cancel-btn" class="btn secondary">キャンセル</button>
+      <button id="save-btn" class="btn primary">保存</button>
+    </div>
+  </div>
+
+  <script type="module" src="settings.js"></script>
+</body>
+</html>
