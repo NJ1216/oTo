@@ -27,6 +27,9 @@ uuid = { version = "1", features = ["v4"] }
 anyhow = "1"
 dirs = "5"
 
+[target.'cfg(unix)'.dependencies]
+libc = "0.2"
+
 [profile.release]
 opt-level = 3
 lto = true

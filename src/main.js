@@ -12,6 +12,7 @@ let isProcessing = false;
 let isDragging = false;
 let toastTimeout = null;
 let activeJobId = null;
+let jobCancelled = false;
 
 // --- DOM refs ---
 const bgContainer = document.getElementById('bg-container');
@@ -55,6 +56,10 @@ async function init() {
   });
 
   await listen('conversion_complete', (event) => {
+    if (jobCancelled) {
+      jobCancelled = false;
+      return;
+    }
     const { successCount, errorCount, results } = event.payload;
     isProcessing = false;
     activeJobId = null;
@@ -242,10 +247,45 @@ function hideContextMenu() {
   contextMenu.style.display = 'none';
 }
 
+// --- Pause dialog ---
+function showPauseDialog() {
+  document.getElementById('pause-dialog').classList.remove('hidden');
+}
+
+function hidePauseDialog() {
+  document.getElementById('pause-dialog').classList.add('hidden');
+}
+
 // --- Misc event listeners ---
 function registerEventListeners() {
-  document.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape') hideContextMenu();
+  document.addEventListener('keydown', async (e) => {
+    if (e.key === 'Escape') {
+      if (activeJobId) {
+        await invoke('pause_job', { jobId: activeJobId }).catch(console.error);
+        showPauseDialog();
+      } else {
+        hideContextMenu();
+      }
+    }
+  });
+
+  document.getElementById('btn-resume').addEventListener('click', async () => {
+    hidePauseDialog();
+    if (activeJobId) {
+      await invoke('resume_job', { jobId: activeJobId }).catch(console.error);
+    }
+  });
+
+  document.getElementById('btn-cancel-job').addEventListener('click', async () => {
+    hidePauseDialog();
+    if (activeJobId) {
+      const jobId = activeJobId;
+      jobCancelled = true;
+      activeJobId = null;
+      isProcessing = false;
+      setState('standby');
+      await invoke('cancel_job', { jobId }).catch(console.error);
+    }
   });
 }
 

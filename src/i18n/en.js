@@ -80,4 +80,9 @@ export default {
     libs: 'Libraries',
     close: 'Close',
   },
+  dialog: {
+    pauseMsg: 'Conversion paused',
+    resume: 'Resume',
+    cancelJob: 'Cancel',
+  },
 };

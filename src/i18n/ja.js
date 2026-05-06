@@ -80,4 +80,9 @@ export default {
     libs: '使用ライブラリ',
     close: '閉じる',
   },
+  dialog: {
+    pauseMsg: '変換を一時停止しました',
+    resume: '続ける',
+    cancelJob: '中止する',
+  },
 };

@@ -9,8 +9,13 @@ mod settings;
 use converter::{run_conversion, ConvertRequest};
 use settings::Settings;
 
+pub struct JobInfo {
+    pub handle: tokio::task::JoinHandle<()>,
+    pub pgids: Arc<Mutex<Vec<i32>>>,
+}
+
 pub struct AppState {
-    pub active_jobs: Mutex<HashMap<String, tokio::task::JoinHandle<()>>>,
+    pub jobs: Mutex<HashMap<String, JobInfo>>,
 }
 
 // --- Commands ---
@@ -23,17 +28,75 @@ async fn convert_files(
 ) -> Result<String, String> {
     let current_settings = settings::load_settings(&app).map_err(|e| e.to_string())?;
     let job_id = uuid::Uuid::new_v4().to_string();
+    let pgids: Arc<Mutex<Vec<i32>>> = Arc::new(Mutex::new(vec![]));
+
     let job_id_clone = job_id.clone();
     let app_clone = app.clone();
     let state_arc = state.inner().clone();
+    let pgids_for_conv = pgids.clone();
 
     let handle = tokio::spawn(async move {
-        run_conversion(app_clone, job_id_clone.clone(), request, current_settings).await;
-        state_arc.active_jobs.lock().await.remove(&job_id_clone);
+        run_conversion(app_clone, job_id_clone.clone(), request, current_settings, pgids_for_conv).await;
+        state_arc.jobs.lock().await.remove(&job_id_clone);
     });
 
-    state.active_jobs.lock().await.insert(job_id.clone(), handle);
+    state.jobs.lock().await.insert(job_id.clone(), JobInfo { handle, pgids });
     Ok(job_id)
+}
+
+#[tauri::command]
+async fn cancel_job(
+    state: State<'_, Arc<AppState>>,
+    job_id: String,
+) -> Result<(), String> {
+    let jobs = state.jobs.lock().await;
+    if let Some(job) = jobs.get(&job_id) {
+        job.handle.abort();
+        #[cfg(unix)]
+        {
+            let pgids = job.pgids.lock().await;
+            for &pgid in pgids.iter() {
+                unsafe { libc::kill(-pgid, libc::SIGKILL); }
+            }
+        }
+    }
+    Ok(())
+}
+
+#[tauri::command]
+async fn pause_job(
+    state: State<'_, Arc<AppState>>,
+    job_id: String,
+) -> Result<(), String> {
+    let jobs = state.jobs.lock().await;
+    if let Some(job) = jobs.get(&job_id) {
+        #[cfg(unix)]
+        {
+            let pgids = job.pgids.lock().await;
+            for &pgid in pgids.iter() {
+                unsafe { libc::kill(-pgid, libc::SIGSTOP); }
+            }
+        }
+    }
+    Ok(())
+}
+
+#[tauri::command]
+async fn resume_job(
+    state: State<'_, Arc<AppState>>,
+    job_id: String,
+) -> Result<(), String> {
+    let jobs = state.jobs.lock().await;
+    if let Some(job) = jobs.get(&job_id) {
+        #[cfg(unix)]
+        {
+            let pgids = job.pgids.lock().await;
+            for &pgid in pgids.iter() {
+                unsafe { libc::kill(-pgid, libc::SIGCONT); }
+            }
+        }
+    }
+    Ok(())
 }
 
 #[tauri::command]
@@ -102,7 +165,7 @@ fn get_app_version() -> String {
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let state = Arc::new(AppState {
-        active_jobs: Mutex::new(HashMap::new()),
+        jobs: Mutex::new(HashMap::new()),
     });
 
     tauri::Builder::default()
@@ -110,6 +173,9 @@ pub fn run() {
         .manage(state)
         .invoke_handler(tauri::generate_handler![
             convert_files,
+            cancel_job,
+            pause_job,
+            resume_job,
             get_settings,
             save_settings,
             open_settings_window,

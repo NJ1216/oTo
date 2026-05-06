@@ -203,3 +203,72 @@ input:checked + .slider::before {
   background: rgba(255, 152, 0, 0.92);
   color: #fff;
 }
+
+/* Pause dialog */
+.pause-dialog {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.55);
+  z-index: 2000;
+  backdrop-filter: blur(3px);
+}
+
+.pause-dialog.hidden {
+  display: none;
+}
+
+.pause-dialog-box {
+  background: rgba(22, 22, 42, 0.97);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 14px;
+  padding: 26px 28px 22px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  min-width: 210px;
+  text-align: center;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6);
+}
+
+.pause-dialog-msg {
+  color: rgba(255, 255, 255, 0.88);
+  font-family: 'Arial', sans-serif;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.pause-dialog-btns {
+  display: flex;
+  gap: 10px;
+}
+
+.pause-dialog-btns button {
+  flex: 1;
+  padding: 9px 0;
+  border-radius: 8px;
+  border: none;
+  font-family: 'Arial', sans-serif;
+  font-size: 12px;
+  font-weight: bold;
+  letter-spacing: 0.03em;
+  cursor: pointer;
+  transition: opacity 0.15s;
+}
+
+.pause-dialog-btns button:hover {
+  opacity: 0.85;
+}
+
+#btn-resume {
+  background: rgba(255, 255, 255, 0.15);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  color: rgba(255, 255, 255, 0.9);
+}
+
+#btn-cancel-job {
+  background: rgba(220, 55, 55, 0.75);
+  color: #fff;
+}

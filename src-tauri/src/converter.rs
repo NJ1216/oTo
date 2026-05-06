@@ -275,6 +275,7 @@ async fn convert_one(
     info: &FileInfo,
     duration_secs: f64,
     on_progress: impl Fn(f64) + Send,
+    on_pid: impl Fn(u32) + Send,
 ) -> Result<()> {
     let ffmpeg = ffmpeg_path();
     let mut args: Vec<String> = vec![
@@ -316,12 +317,27 @@ async fn convert_one(
 
     args.push(output.to_str().unwrap().to_string());
 
-    let mut child = tokio::process::Command::new(&ffmpeg)
-        .args(&args)
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
-        .spawn()
+    let mut cmd = tokio::process::Command::new(&ffmpeg);
+    cmd.args(&args)
+       .stdout(Stdio::piped())
+       .stderr(Stdio::piped());
+
+    #[cfg(unix)]
+    unsafe {
+        cmd.pre_exec(|| {
+            if libc::setpgid(0, 0) != 0 {
+                return Err(std::io::Error::last_os_error());
+            }
+            Ok(())
+        });
+    }
+
+    let mut child = cmd.spawn()
         .map_err(|e| anyhow!("failed to spawn ffmpeg: {}", e))?;
+
+    if let Some(pid) = child.id() {
+        on_pid(pid);
+    }
 
     let stderr_task = child.stderr.take().map(|stderr| {
         tokio::spawn(async move {
@@ -381,6 +397,7 @@ pub async fn run_conversion(
     job_id: String,
     request: ConvertRequest,
     settings: Settings,
+    pgids: Arc<tokio::sync::Mutex<Vec<i32>>>,
 ) {
     let format = if request.mode == "decode" {
         "wav".to_string()
@@ -476,6 +493,7 @@ pub async fn run_conversion(
         let progress_secs = progress_secs.clone();
         let input_path = info.path.clone();
         let file_duration = info.duration_secs;
+        let pgids_for_spawn = pgids.clone();
 
         join_set.spawn(async move {
             let _permit = sem.acquire().await.unwrap();
@@ -531,6 +549,10 @@ pub async fn run_conversion(
                             },
                         );
                     });
+                },
+                move |pid| {
+                    let p = pgids_for_spawn.clone();
+                    tokio::spawn(async move { p.lock().await.push(pid as i32); });
                 },
             )
             .await;
