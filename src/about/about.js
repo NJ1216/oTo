@@ -1,4 +1,4 @@
-import { initI18n } from '../i18n/index.js';
+import { initI18n, t } from '../i18n/index.js';
 
 const { invoke } = window.__TAURI__.core;
 
@@ -10,7 +10,7 @@ const BADGE_CLASS = {
 
 const LIBS = [
   { name: 'oTo',             license: 'MIT',       url: 'https://github.com/' },
-  { section: 'Rust（バックエンド）' },
+  { sectionKey: 'about.libsSection.rust' },
   { name: 'tauri',           license: 'MIT',       url: 'https://tauri.app' },
   { name: 'FFmpeg',          license: 'LGPL 2.1+', url: 'https://ffmpeg.org' },
   { name: 'tokio',           license: 'MIT',       url: 'https://tokio.rs' },
@@ -19,17 +19,17 @@ const LIBS = [
   { name: 'uuid',            license: 'MIT',       url: 'https://github.com/uuid-rs/uuid' },
   { name: 'anyhow',          license: 'MIT',       url: 'https://github.com/dtolnay/anyhow' },
   { name: 'dirs',            license: 'MIT',       url: 'https://github.com/dirs-dev/dirs-rs' },
-  { section: 'JavaScript（フロントエンド）' },
+  { sectionKey: 'about.libsSection.js' },
   { name: '@tauri-apps/api', license: 'MIT',       url: 'https://tauri.app' },
 ];
 
 function buildLibList() {
   const container = document.getElementById('lib-list');
   for (const item of LIBS) {
-    if (item.section) {
+    if (item.sectionKey) {
       const el = document.createElement('div');
       el.className = 'lib-section-header';
-      el.textContent = item.section;
+      el.textContent = t(item.sectionKey);
       container.appendChild(el);
     } else {
       const row = document.createElement('div');
@@ -58,6 +58,9 @@ async function init() {
   } catch (_) {}
 
   await initI18n(lang);
+  const title = t('window.about');
+  document.title = title;
+  window.__TAURI__.webviewWindow.getCurrentWebviewWindow().setTitle(title);
   buildLibList();
 
   const version = await invoke('get_app_version');

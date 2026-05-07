@@ -1,4 +1,4 @@
-import { initI18n } from '../i18n/index.js';
+import { initI18n, t } from '../i18n/index.js';
 
 const { invoke } = window.__TAURI__.core;
 
@@ -9,6 +9,9 @@ async function init() {
   settings = await invoke('get_settings');
   customPath = settings.customOutputPath || null;
   await initI18n(settings.language || '');
+  const title = t('window.settings');
+  document.title = title;
+  window.__TAURI__.webviewWindow.getCurrentWebviewWindow().setTitle(title);
   populateForm(settings);
 }
 

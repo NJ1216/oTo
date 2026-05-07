@@ -1,4 +1,9 @@
 export default {
+  window: {
+    main: 'oTo',
+    settings: 'Settings',
+    about: 'About',
+   },
   menu: {
     settings: 'Settings',
     about: 'About',
@@ -70,6 +75,8 @@ export default {
     lang: {
       title: 'Language',
       auto: 'Follow system setting',
+      ja: 'Japanese',
+      en: 'English',
     },
     cancel: 'Cancel',
     save: 'Save',
@@ -79,6 +86,10 @@ export default {
     loading: 'Loading…',
     libs: 'Libraries',
     close: 'Close',
+    libsSection: {
+      rust: 'Rust (Backend)',
+      js: 'JavaScript (Frontend)',
+    },
   },
   dialog: {
     pauseMsg: 'Conversion paused',

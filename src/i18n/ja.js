@@ -1,4 +1,9 @@
 export default {
+  window: {
+    main: 'oTo',
+    settings: '設定',
+    about: 'バージョン情報',
+   },
   menu: {
     settings: '設定',
     about: 'バージョン情報',
@@ -70,6 +75,8 @@ export default {
     lang: {
       title: '言語',
       auto: 'システム設定に従う',
+      ja: '日本語',
+      en: 'English',
     },
     cancel: 'キャンセル',
     save: '保存',
@@ -79,6 +86,10 @@ export default {
     loading: '読み込み中…',
     libs: '使用ライブラリ',
     close: '閉じる',
+    libsSection: {
+      rust: 'Rust（バックエンド）',
+      js: 'JavaScript（フロントエンド）',
+    },
   },
   dialog: {
     pauseMsg: '変換を一時停止しました',

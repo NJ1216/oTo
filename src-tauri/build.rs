@@ -8,5 +8,6 @@ fn main() {
         .trim()
         .to_string();
     println!("cargo:rustc-env=GIT_HASH={}", git_hash);
+    println!("cargo:rerun-if-changed=.git");
     tauri_build::build()
 }

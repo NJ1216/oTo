@@ -179,8 +179,8 @@ input:checked + .slider::before {
   pointer-events: none;
   opacity: 0;
   transition: opacity 0.25s;
-  white-space: normal;
-  max-width: 270px;
+  white-space: nowrap;
+  max-width: none;
   text-align: center;
   line-height: 1.4;
 }

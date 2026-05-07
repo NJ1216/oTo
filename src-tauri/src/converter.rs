@@ -606,6 +606,18 @@ pub async fn run_conversion(
         }
     }
 
+    // Emit final 100% progress before switching to standby
+    let _ = app.emit(
+        "progress",
+        ProgressPayload {
+            job_id: job_id.clone(),
+            percent: 100.0,
+            current_file: String::new(),
+            file_index: file_count,
+            file_count,
+        },
+    );
+
     let _ = app.emit(
         "conversion_complete",
         CompletionPayload {

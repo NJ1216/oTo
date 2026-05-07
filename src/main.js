@@ -34,6 +34,9 @@ async function init() {
   }
 
   await initI18n(appSettings.language || '');
+  const title = t('window.main');
+  document.title = title;
+  window.__TAURI__.webviewWindow.getCurrentWebviewWindow().setTitle(title);
 
   currentMode = appSettings.lastMode || 'encode';
   currentFormat = appSettings.lastFormat || 'mp3';

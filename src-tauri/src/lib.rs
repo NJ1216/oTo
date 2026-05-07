@@ -116,7 +116,7 @@ async fn open_settings_window(app: AppHandle) -> Result<(), String> {
         win.set_focus().map_err(|e| e.to_string())?;
     } else {
         WebviewWindowBuilder::new(&app, "settings", WebviewUrl::App("settings/settings.html".into()))
-            .title("oTo - 設定")
+            .title("oTo - Settings")
             .inner_size(480.0, 560.0)
             .resizable(false)
             .build()
@@ -132,7 +132,7 @@ async fn open_about_window(app: AppHandle) -> Result<(), String> {
         win.set_focus().map_err(|e| e.to_string())?;
     } else {
         WebviewWindowBuilder::new(&app, "about", WebviewUrl::App("about/about.html".into()))
-            .title("oTo について")
+            .title("oTo - About")
             .inner_size(400.0, 460.0)
             .resizable(false)
             .build()
