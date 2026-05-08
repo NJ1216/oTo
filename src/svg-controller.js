@@ -3,6 +3,10 @@ export const FORMAT_THEME = {
   m4a:  { color: '#2196F3', colorDark: '#0A2A4A', colorSecondary: '#1565C0' },
   wav:  { color: '#4CAF50', colorDark: '#1A3A1A', colorSecondary: '#388E3C' },
   flac: { color: '#9C27B0', colorDark: '#2A0A3A', colorSecondary: '#7B1FA2' },
+  alac: { color: '#FFC107', colorDark: '#3D2900', colorSecondary: '#FF8F00' },
+  ogg:  { color: '#00BCD4', colorDark: '#003038', colorSecondary: '#0097A7' },
+  opus: { color: '#E91E63', colorDark: '#3D0020', colorSecondary: '#C2185B' },
+  aiff: { color: '#5C6BC0', colorDark: '#0D1240', colorSecondary: '#3949AB' },
 };
 
 // Base template colors (MP3/ENCODE)
@@ -71,9 +75,7 @@ export function setState(state) {
 
   const svgName = getSVGName(state);
   const raw = svgCache[svgName] || '';
-  // デコードモード時は常にWAV表示・WAVテーマカラーを使用
-  const effectiveFormat = currentMode === 'decode' ? 'wav' : currentFormat;
-  const themed = applyTheme(raw, effectiveFormat, currentMode);
+  const themed = applyTheme(raw, currentFormat, currentMode);
   container.innerHTML = themed;
 
   if (state === 'processing') {

@@ -102,10 +102,14 @@ input:checked + .slider::before {
 /* Format selector */
 #format-selector {
   display: flex;
+  flex-wrap: wrap;
   gap: 5px;
+  justify-content: center;
+  max-width: 172px;
 }
 
-.fmt-btn {
+.fmt-btn,
+.decode-fmt-btn {
   background: rgba(255, 255, 255, 0.08);
   border: 1px solid rgba(255, 255, 255, 0.15);
   border-radius: 4px;
@@ -119,12 +123,14 @@ input:checked + .slider::before {
   transition: background 0.2s, color 0.2s, border-color 0.2s;
 }
 
-.fmt-btn:hover {
+.fmt-btn:hover,
+.decode-fmt-btn:hover {
   background: rgba(255, 255, 255, 0.14);
   color: rgba(255, 255, 255, 0.8);
 }
 
-.fmt-btn.active {
+.fmt-btn.active,
+.decode-fmt-btn.active {
   background: rgba(255, 255, 255, 0.18);
   border-color: rgba(255, 255, 255, 0.4);
   color: rgba(255, 255, 255, 0.95);

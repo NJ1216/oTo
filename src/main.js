@@ -101,6 +101,7 @@ function applyDecodeFormatToUI() {
   document.querySelectorAll('.decode-fmt-btn').forEach((btn) => {
     btn.classList.toggle('active', btn.dataset.fmt === currentDecodeFormat);
   });
+  setFormat(currentDecodeFormat);
 }
 
 function applyFormatToUI() {
