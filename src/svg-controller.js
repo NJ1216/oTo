@@ -1,6 +1,6 @@
 export const FORMAT_THEME = {
   mp3:  { color: '#FF9800', colorDark: '#4A2800', colorSecondary: '#E68900' },
-  m4a:  { color: '#2196F3', colorDark: '#0A2A4A', colorSecondary: '#1565C0' },
+  aac:  { color: '#2196F3', colorDark: '#0A2A4A', colorSecondary: '#1565C0' },
   wav:  { color: '#4CAF50', colorDark: '#1A3A1A', colorSecondary: '#388E3C' },
   flac: { color: '#9C27B0', colorDark: '#2A0A3A', colorSecondary: '#7B1FA2' },
   alac: { color: '#FFC107', colorDark: '#3D2900', colorSecondary: '#FF8F00' },

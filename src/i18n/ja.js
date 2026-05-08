@@ -49,8 +49,8 @@ export default {
         256: '256 kbps',
         320: '320 kbps',
       },
-      m4a: {
-        label: 'M4A ビットレート',
+      aac: {
+        label: 'AAC ビットレート',
         96: '96 kbps',
         128: '128 kbps（デフォルト）',
         192: '192 kbps',

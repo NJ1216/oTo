@@ -224,8 +224,11 @@ fn resolve_output_path(
 
     std::fs::create_dir_all(&output_dir)?;
 
-    // ALAC は M4A コンテナを使う
-    let ext = if format == "alac" { "m4a" } else { format };
+    // ALAC・AAC は M4A コンテナを使う
+    let ext = match format {
+        "alac" | "aac" => "m4a",
+        other => other,
+    };
     let filename = format!("{}.{}", stem, ext);
     let candidate = output_dir.join(&filename);
 
@@ -270,7 +273,7 @@ fn build_codec_args(format: &str, settings: &Settings, info: &FileInfo) -> Vec<S
             }
             args
         }
-        "m4a" => vec![
+        "aac" => vec![
             "-c:a".into(),
             "aac".into(),
             "-b:a".into(),

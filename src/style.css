@@ -102,10 +102,7 @@ input:checked + .slider::before {
 /* Format selector */
 #format-selector {
   display: flex;
-  flex-wrap: wrap;
   gap: 5px;
-  justify-content: center;
-  max-width: 172px;
 }
 
 .fmt-btn,

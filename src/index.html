@@ -14,13 +14,13 @@
   <div id="ui-overlay">
     <!-- Format selector -->
     <div id="format-selector">
-      <!-- ENCODE formats (enabled_formats でフィルタ) -->
+      <!-- ENCODE formats: 非可逆(MP3/AAC/OGG/OPUS) → 可逆(FLAC/ALAC) -->
       <button class="fmt-btn active" data-fmt="mp3">MP3</button>
-      <button class="fmt-btn" data-fmt="m4a">M4A</button>
-      <button class="fmt-btn" data-fmt="flac">FLAC</button>
-      <button class="fmt-btn" data-fmt="alac">ALAC</button>
+      <button class="fmt-btn" data-fmt="aac">AAC</button>
       <button class="fmt-btn" data-fmt="ogg">OGG</button>
       <button class="fmt-btn" data-fmt="opus">OPUS</button>
+      <button class="fmt-btn" data-fmt="flac">FLAC</button>
+      <button class="fmt-btn" data-fmt="alac">ALAC</button>
       <!-- DECODE formats -->
       <button class="decode-fmt-btn active" data-fmt="wav">WAV</button>
       <button class="decode-fmt-btn" data-fmt="aiff">AIFF</button>

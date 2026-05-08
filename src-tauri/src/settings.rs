@@ -28,7 +28,7 @@ pub enum NameConflict {
 }
 
 fn default_enabled_formats() -> Vec<String> {
-    vec!["mp3".into(), "m4a".into(), "flac".into()]
+    vec!["mp3".into(), "aac".into(), "flac".into()]
 }
 
 fn default_mp3_channel_mode() -> String {

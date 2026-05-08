@@ -49,8 +49,8 @@ export default {
         256: '256 kbps',
         320: '320 kbps',
       },
-      m4a: {
-        label: 'M4A Bitrate',
+      aac: {
+        label: 'AAC Bitrate',
         96: '96 kbps',
         128: '128 kbps (default)',
         192: '192 kbps',
