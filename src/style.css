@@ -183,7 +183,7 @@ input:checked + .slider::before {
   opacity: 0;
   transition: opacity 0.25s;
   white-space: pre-wrap;
-  max-width: 320px;
+  max-width: 380px;
   text-align: center;
   line-height: 1.4;
 }

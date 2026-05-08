@@ -10,8 +10,8 @@ export default {
   },
   toast: {
     done: {
-      one: '変換完了 (1ファイル)',
-      many: '変換完了 ({n}ファイル)',
+      one: '変換完了\n(1ファイル)',
+      many: '変換完了\n({n}ファイル)',
     },
     fail: {
       all: '変換失敗 ({n}件) — 詳細はDevToolsで確認',
