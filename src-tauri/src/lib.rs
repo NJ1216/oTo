@@ -23,7 +23,7 @@ pub struct AppState {
 #[tauri::command]
 async fn convert_files(
     app: AppHandle,
-    state: State<'_, Arc<AppState>>,
+    state: State<'_, AppState>,
     request: ConvertRequest,
 ) -> Result<String, String> {
     let current_settings = settings::load_settings(&app).map_err(|e| e.to_string())?;
@@ -32,12 +32,13 @@ async fn convert_files(
 
     let job_id_clone = job_id.clone();
     let app_clone = app.clone();
-    let state_arc = state.inner().clone();
+    let app_for_cleanup = app.clone();
+    let job_id_for_cleanup = job_id.clone();
     let pgids_for_conv = pgids.clone();
 
     let handle = tokio::spawn(async move {
-        run_conversion(app_clone, job_id_clone.clone(), request, current_settings, pgids_for_conv).await;
-        state_arc.jobs.lock().await.remove(&job_id_clone);
+        run_conversion(app_clone, job_id_clone, request, current_settings, pgids_for_conv).await;
+        app_for_cleanup.state::<AppState>().jobs.lock().await.remove(&job_id_for_cleanup);
     });
 
     state.jobs.lock().await.insert(job_id.clone(), JobInfo { handle, pgids });
@@ -46,7 +47,7 @@ async fn convert_files(
 
 #[tauri::command]
 async fn cancel_job(
-    state: State<'_, Arc<AppState>>,
+    state: State<'_, AppState>,
     job_id: String,
 ) -> Result<(), String> {
     let jobs = state.jobs.lock().await;
@@ -65,7 +66,7 @@ async fn cancel_job(
 
 #[tauri::command]
 async fn pause_job(
-    state: State<'_, Arc<AppState>>,
+    state: State<'_, AppState>,
     job_id: String,
 ) -> Result<(), String> {
     let jobs = state.jobs.lock().await;
@@ -83,7 +84,7 @@ async fn pause_job(
 
 #[tauri::command]
 async fn resume_job(
-    state: State<'_, Arc<AppState>>,
+    state: State<'_, AppState>,
     job_id: String,
 ) -> Result<(), String> {
     let jobs = state.jobs.lock().await;
@@ -164,9 +165,9 @@ fn get_app_version() -> String {
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    let state = Arc::new(AppState {
+    let state = AppState {
         jobs: Mutex::new(HashMap::new()),
-    });
+    };
 
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())

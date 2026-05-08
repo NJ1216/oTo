@@ -59,6 +59,7 @@ struct FileInfo {
     duration_secs: f64,
     tags: HashMap<String, String>,
     bits_per_sample: u32,
+    has_cover_art: bool,
 }
 
 // --- FFmpeg/FFprobe path resolution ---
@@ -124,8 +125,6 @@ async fn probe_file(path: &Path) -> FileInfo {
             "json",
             "-show_format",
             "-show_streams",
-            "-select_streams",
-            "a:0",
             path.to_str().unwrap_or(""),
         ])
         .output()
@@ -135,6 +134,7 @@ async fn probe_file(path: &Path) -> FileInfo {
     let mut duration = 0.0f64;
     let mut tags = HashMap::new();
     let mut bits_per_sample = 16u32;
+    let mut has_cover_art = false;
 
     if let Some(out) = output {
         if let Ok(json) = serde_json::from_slice::<serde_json::Value>(&out.stdout) {
@@ -148,21 +148,35 @@ async fn probe_file(path: &Path) -> FileInfo {
                     }
                 }
             }
-            // Also check stream-level tags
-            if let Some(stream_tags) = json["streams"][0]["tags"].as_object() {
-                for (k, v) in stream_tags {
-                    if let Some(s) = v.as_str() {
-                        tags.entry(k.to_lowercase()).or_insert_with(|| s.to_string());
+            if let Some(streams) = json["streams"].as_array() {
+                for stream in streams {
+                    match stream["codec_type"].as_str().unwrap_or("") {
+                        "audio" => {
+                            if let Some(stream_tags) = stream["tags"].as_object() {
+                                for (k, v) in stream_tags {
+                                    if let Some(s) = v.as_str() {
+                                        tags.entry(k.to_lowercase()).or_insert_with(|| s.to_string());
+                                    }
+                                }
+                            }
+                            if let Some(bps) = stream["bits_per_raw_sample"]
+                                .as_str()
+                                .and_then(|s| s.parse::<u32>().ok())
+                                .or_else(|| stream["bits_per_raw_sample"].as_u64().map(|v| v as u32))
+                            {
+                                if bps > 0 {
+                                    bits_per_sample = bps;
+                                }
+                            }
+                        }
+                        "video" => {
+                            // disposition.attached_pic == 1 はカバーアート（埋め込み画像）
+                            if stream["disposition"]["attached_pic"].as_i64().unwrap_or(0) == 1 {
+                                has_cover_art = true;
+                            }
+                        }
+                        _ => {}
                     }
-                }
-            }
-            if let Some(bps) = json["streams"][0]["bits_per_raw_sample"]
-                .as_str()
-                .and_then(|s| s.parse::<u32>().ok())
-                .or_else(|| json["streams"][0]["bits_per_raw_sample"].as_u64().map(|v| v as u32))
-            {
-                if bps > 0 {
-                    bits_per_sample = bps;
                 }
             }
         }
@@ -173,6 +187,7 @@ async fn probe_file(path: &Path) -> FileInfo {
         duration_secs: duration,
         tags,
         bits_per_sample,
+        has_cover_art,
     }
 }
 
@@ -289,9 +304,10 @@ async fn convert_one(
     ];
 
     // カバーアート（埋め込み画像）の引き継ぎ
-    // WAVはコンテナ仕様上カバーアート非対応。他フォーマットは画像ストリームをそのままコピーして埋め込む。
-    // -c:v copy でJPEGを再エンコードせずに保持し、attached_pic でカバーアートとしてマーク。
-    if format != "wav" {
+    // WAVはコンテナ仕様上カバーアート非対応。カバーアートが存在する場合のみ画像ストリームをコピーする。
+    // probe_file で attached_pic フラグを確認済みのため、動画ストリームを誤ってカバーアートとして
+    // マップするバグ（MP4→MP3/M4A変換で数秒しか出力されない問題）を防ぐ。
+    if format != "wav" && info.has_cover_art {
         args.extend([
             "-map".into(),
             "0:v?".into(),
@@ -473,6 +489,7 @@ pub async fn run_conversion(
             duration_secs: 0.0,
             tags: HashMap::new(),
             bits_per_sample: 16,
+            has_cover_art: false,
         }));
     }
 
