@@ -595,10 +595,17 @@ pub async fn run_conversion(
     // Shared progress state: each file's completed seconds
     let progress_secs = Arc::new(tokio::sync::Mutex::new(vec![0.0f64; file_count]));
 
+    // ドロップされた元パスの親ディレクトリを基点にすることで、
+    // ドロップしたフォルダ名自体も出力パスに含まれるようにする
     let base_dir: Option<PathBuf> = if settings.preserve_folder_structure
         && settings.output_dest != OutputDest::SourceFolder
     {
-        common_ancestor(&file_paths)
+        let drop_parents: Vec<PathBuf> = request
+            .paths
+            .iter()
+            .filter_map(|p| PathBuf::from(p).parent().map(|d| d.to_path_buf()))
+            .collect();
+        common_ancestor(&drop_parents)
     } else {
         None
     };
