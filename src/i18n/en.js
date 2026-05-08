@@ -18,7 +18,6 @@ export default {
       partial: '{ok} succeeded / {err} failed — see DevTools for details',
     },
     error: 'Error: {msg}',
-    missingLibvorbis: 'OGG requires libvorbis.\nRun: brew reinstall ffmpeg',
   },
   settings: {
     title: 'Settings',
@@ -58,13 +57,6 @@ export default {
         192: '192 kbps',
         256: '256 kbps',
       },
-      ogg: {
-        label: 'OGG Quality',
-        q2: 'Q2 (low)',
-        q4: 'Q4 (default)',
-        q6: 'Q6 (high)',
-        q8: 'Q8 (best)',
-      },
       opus: {
         label: 'OPUS Bitrate',
         64: '64 kbps',
@@ -92,7 +84,6 @@ export default {
       jointStereo: 'Joint Stereo',
       stereo: 'Stereo',
       mono: 'Mono',
-      oggQuality: 'Quality (0–10)',
       opusComplexity: 'Complexity (0–10)',
       flacLevel: 'Compression Level (0–8)',
       bitDepth: 'Bit Depth',

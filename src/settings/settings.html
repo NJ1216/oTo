@@ -193,62 +193,6 @@
           </div>
         </div>
 
-        <!-- OGG -->
-        <label data-i18n="settings.quality.ogg.label">OGG クオリティ</label>
-        <div class="select-wrap">
-          <select id="oggPreset">
-            <option value="q2" data-i18n="settings.quality.ogg.q2">Q2（低）</option>
-            <option value="q4" data-i18n="settings.quality.ogg.q4">Q4（デフォルト）</option>
-            <option value="q6" data-i18n="settings.quality.ogg.q6">Q6（高）</option>
-            <option value="q8" data-i18n="settings.quality.ogg.q8">Q8（最高）</option>
-            <option value="custom" data-i18n="settings.quality.custom">カスタム…</option>
-          </select>
-        </div>
-        <div class="custom-detail" id="oggCustom">
-          <div class="custom-inner">
-            <div class="full-row mode-row">
-              <label><input type="radio" name="oggMode" value="vbr" checked /> <span data-i18n="settings.custom.vbr">VBR</span></label>
-              <label><input type="radio" name="oggMode" value="cbr" /> <span data-i18n="settings.custom.cbr">CBR</span></label>
-            </div>
-            <div id="oggVbrRows" class="full-row inner-grid">
-              <label data-i18n="settings.custom.oggQuality">クオリティ (0–10)</label>
-              <div class="select-wrap">
-                <select id="oggQuality">
-                  <option value="-1">-1 (very low)</option>
-                  <option value="0">0</option>
-                  <option value="1">1</option>
-                  <option value="2">2</option>
-                  <option value="3">3</option>
-                  <option value="4">4</option>
-                  <option value="5">5</option>
-                  <option value="6">6</option>
-                  <option value="7">7</option>
-                  <option value="8">8</option>
-                  <option value="9">9</option>
-                  <option value="10">10 (best)</option>
-                </select>
-              </div>
-            </div>
-            <div id="oggCbrRows" class="full-row inner-grid" style="display:none">
-              <label data-i18n="settings.custom.bitrate">ビットレート (kbps)</label>
-              <div class="select-wrap">
-                <select id="oggCbrBitrate">
-                  <option value="64">64 kbps</option>
-                  <option value="80">80 kbps</option>
-                  <option value="96">96 kbps</option>
-                  <option value="112">112 kbps</option>
-                  <option value="128">128 kbps</option>
-                  <option value="160">160 kbps</option>
-                  <option value="192">192 kbps</option>
-                  <option value="224">224 kbps</option>
-                  <option value="256">256 kbps</option>
-                  <option value="320">320 kbps</option>
-                </select>
-              </div>
-            </div>
-          </div>
-        </div>
-
         <!-- OPUS -->
         <label data-i18n="settings.quality.opus.label">OPUS ビットレート</label>
         <div class="select-wrap">
@@ -364,7 +308,6 @@
       <div class="format-check-group">
         <label class="checkbox-row"><input type="checkbox" class="fmt-check" data-fmt="mp3" /> <span>MP3</span></label>
         <label class="checkbox-row"><input type="checkbox" class="fmt-check" data-fmt="aac" /> <span>AAC</span></label>
-        <label class="checkbox-row"><input type="checkbox" class="fmt-check" data-fmt="ogg" /> <span>OGG</span></label>
         <label class="checkbox-row"><input type="checkbox" class="fmt-check" data-fmt="opus" /> <span>OPUS</span></label>
         <label class="checkbox-row"><input type="checkbox" class="fmt-check" data-fmt="flac" /> <span>FLAC</span></label>
         <label class="checkbox-row"><input type="checkbox" class="fmt-check" data-fmt="alac" /> <span>ALAC</span></label>

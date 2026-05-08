@@ -36,8 +36,6 @@ fn default_last_decode_format() -> String { "wav".into() }
 
 fn default_mp3_preset() -> String  { "192".into() }
 fn default_aac_preset() -> String  { "128".into() }
-fn default_ogg_preset() -> String  { "q4".into() }
-fn default_ogg_quality() -> f32    { 4.0 }
 fn default_opus_preset() -> String { "128".into() }
 fn default_opus_bitrate() -> u32   { 128 }
 fn default_opus_complexity() -> u32 { 5 }
@@ -50,8 +48,6 @@ fn default_mp3_vbr_quality() -> u32 { 4 }
 fn default_aac_mode() -> String     { "cbr".into() }
 fn default_m4a_bitrate() -> u32     { 128 }
 fn default_aac_vbr_quality() -> u32 { 4 }
-fn default_ogg_mode() -> String     { "vbr".into() }
-fn default_ogg_cbr_bitrate() -> u32 { 192 }
 fn default_opus_mode() -> String    { "vbr".into() }
 
 fn calc_parallel_count(full_power: bool) -> usize {
@@ -95,16 +91,6 @@ pub struct Settings {
     pub aac_sample_rate: u32,
     #[serde(default)]
     pub aac_channels: u32,
-
-    // OGG
-    #[serde(default = "default_ogg_preset")]
-    pub ogg_preset: String,
-    #[serde(default = "default_ogg_mode")]
-    pub ogg_mode: String,
-    #[serde(default = "default_ogg_quality")]
-    pub ogg_quality: f32,
-    #[serde(default = "default_ogg_cbr_bitrate")]
-    pub ogg_cbr_bitrate: u32,
 
     // OPUS
     #[serde(default = "default_opus_preset")]
@@ -162,10 +148,6 @@ impl Default for Settings {
             aac_vbr_quality: default_aac_vbr_quality(),
             aac_sample_rate: 0,
             aac_channels: 0,
-            ogg_preset: default_ogg_preset(),
-            ogg_mode: default_ogg_mode(),
-            ogg_quality: default_ogg_quality(),
-            ogg_cbr_bitrate: default_ogg_cbr_bitrate(),
             opus_preset: default_opus_preset(),
             opus_mode: default_opus_mode(),
             opus_bitrate: default_opus_bitrate(),

@@ -4,7 +4,6 @@ export const FORMAT_THEME = {
   wav:  { color: '#4CAF50', colorDark: '#1A3A1A', colorSecondary: '#388E3C' },
   flac: { color: '#9C27B0', colorDark: '#2A0A3A', colorSecondary: '#7B1FA2' },
   alac: { color: '#F06292', colorDark: '#3D0025', colorSecondary: '#E91E63' },
-  ogg:  { color: '#69F0AE', colorDark: '#003D20', colorSecondary: '#00C853' },
   opus: { color: '#90A4AE', colorDark: '#1C2B33', colorSecondary: '#607D8B' },
   aiff: { color: '#5C6BC0', colorDark: '#0D1240', colorSecondary: '#3949AB' },
 };

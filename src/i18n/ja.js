@@ -18,7 +18,6 @@ export default {
       partial: '{ok}件成功 / {err}件失敗 — DevToolsで詳細確認',
     },
     error: 'エラー: {msg}',
-    missingLibvorbis: 'OGGにはlibvorbisが必要です。\nbrew reinstall ffmpeg を実行してください。',
   },
   settings: {
     title: '設定',
@@ -58,13 +57,6 @@ export default {
         192: '192 kbps',
         256: '256 kbps',
       },
-      ogg: {
-        label: 'OGG クオリティ',
-        q2: 'Q2（低）',
-        q4: 'Q4（デフォルト）',
-        q6: 'Q6（高）',
-        q8: 'Q8（最高）',
-      },
       opus: {
         label: 'OPUS ビットレート',
         64: '64 kbps',
@@ -92,7 +84,6 @@ export default {
       jointStereo: 'Joint Stereo',
       stereo: 'Stereo',
       mono: 'Mono',
-      oggQuality: 'クオリティ (0–10)',
       opusComplexity: '複雑度 (0–10)',
       flacLevel: '圧縮レベル (0–8)',
       bitDepth: 'ビット深度',

@@ -51,13 +51,6 @@ function populateForm(s) {
   document.getElementById('aacSampleRate').value = String(s.aacSampleRate ?? 0);
   document.getElementById('aacChannels').value = String(s.aacChannels ?? 0);
 
-  setPreset('oggPreset', s.oggPreset || 'q4');
-  const oggMode = s.oggMode || 'vbr';
-  document.querySelectorAll('input[name="oggMode"]').forEach((r) => { r.checked = r.value === oggMode; });
-  toggleCbrVbr('ogg', oggMode);
-  document.getElementById('oggQuality').value = String(s.oggQuality ?? 4);
-  document.getElementById('oggCbrBitrate').value = String(s.oggCbrBitrate || 192);
-
   setPreset('opusPreset', s.opusPreset || '128');
   const opusMode = s.opusMode || 'vbr';
   document.querySelectorAll('input[name="opusMode"]').forEach((r) => { r.checked = r.value === opusMode; });
@@ -107,14 +100,14 @@ function toggleCustomDetail(selectId, show) {
 }
 
 // Wire up all preset selects to show/hide custom panels
-['mp3Preset', 'aacPreset', 'oggPreset', 'opusPreset', 'flacPreset', 'alacPreset'].forEach((id) => {
+['mp3Preset', 'aacPreset', 'opusPreset', 'flacPreset', 'alacPreset'].forEach((id) => {
   document.getElementById(id)?.addEventListener('change', (e) => {
     toggleCustomDetail(id, e.target.value === 'custom');
   });
 });
 
 // CBR/VBR mode radios
-['mp3', 'aac', 'ogg'].forEach((fmt) => {
+['mp3', 'aac'].forEach((fmt) => {
   document.querySelectorAll(`input[name="${fmt}Mode"]`).forEach((r) => {
     r.addEventListener('change', (e) => toggleCbrVbr(fmt, e.target.value));
   });
@@ -168,10 +161,6 @@ document.getElementById('save-btn').addEventListener('click', async () => {
     aacVbrQuality: parseInt(document.getElementById('aacVbrQuality').value, 10) ?? 4,
     aacSampleRate: parseInt(document.getElementById('aacSampleRate').value, 10),
     aacChannels: parseInt(document.getElementById('aacChannels').value, 10),
-    oggPreset: document.getElementById('oggPreset').value,
-    oggMode: document.querySelector('input[name="oggMode"]:checked')?.value || 'vbr',
-    oggQuality: parseFloat(document.getElementById('oggQuality').value) ?? 4,
-    oggCbrBitrate: parseInt(document.getElementById('oggCbrBitrate').value, 10) || 192,
     opusPreset: document.getElementById('opusPreset').value,
     opusMode: document.querySelector('input[name="opusMode"]:checked')?.value || 'vbr',
     opusBitrate: parseInt(document.getElementById('opusBitrate').value, 10) || 128,

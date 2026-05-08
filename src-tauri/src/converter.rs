@@ -13,7 +13,7 @@ use walkdir::WalkDir;
 use crate::settings::{NameConflict, OutputDest, Settings, SourceFileAction};
 
 const SUPPORTED_EXTS: &[&str] = &[
-    "wav", "mp3", "m4a", "aac", "flac", "alac", "ogg", "opus", "aiff", "aif", "wma",
+    "wav", "mp3", "m4a", "aac", "flac", "alac", "opus", "aiff", "aif", "wma",
     "mp4", "mov", "mkv", "avi",
 ];
 
@@ -300,23 +300,6 @@ fn build_codec_args(format: &str, settings: &Settings, info: &FileInfo) -> Vec<S
             }
             args
         }
-        "ogg" => {
-            let mut args = vec!["-c:a".into(), "libvorbis".into()];
-            if settings.ogg_preset == "custom" {
-                if settings.ogg_mode == "cbr" {
-                    args.extend(["-b:a".into(), format!("{}k", settings.ogg_cbr_bitrate)]);
-                } else {
-                    args.extend(["-q:a".into(), format!("{}", settings.ogg_quality)]);
-                }
-            } else {
-                let quality = settings.ogg_preset
-                    .trim_start_matches('q')
-                    .parse::<f32>()
-                    .unwrap_or(4.0);
-                args.extend(["-q:a".into(), format!("{}", quality)]);
-            }
-            args
-        }
         "opus" => {
             let mut args = vec!["-c:a".into(), "libopus".into()];
             if settings.opus_preset == "custom" {
@@ -473,12 +456,6 @@ async fn convert_one(
     };
 
     if !status.success() {
-        // libvorbis が FFmpeg にコンパイルされていない場合の専用エラー
-        if stderr_text.contains("libvorbis")
-            && (stderr_text.contains("Unknown encoder") || stderr_text.contains("Encoder not found"))
-        {
-            return Err(anyhow!("MISSING_ENCODER:libvorbis"));
-        }
         let tail: String = stderr_text
             .lines()
             .filter(|l| !l.trim().is_empty())
