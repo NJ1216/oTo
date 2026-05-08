@@ -184,7 +184,10 @@ pub fn load_settings(app: &AppHandle) -> Result<Settings> {
         return Ok(Settings::default());
     }
     let data = std::fs::read_to_string(&path)?;
-    let mut settings: Settings = serde_json::from_str(&data).unwrap_or_default();
+    let mut settings: Settings = serde_json::from_str(&data).unwrap_or_else(|e| {
+        eprintln!("Failed to parse settings.json: {e}");
+        Settings::default()
+    });
     settings.parallel_count = calc_parallel_count(settings.full_power);
     Ok(settings)
 }

@@ -156,27 +156,18 @@ document.querySelectorAll('.decode-fmt-btn').forEach((btn) => {
 });
 
 // --- Drag & Drop via Tauri events ---
+function setDragHover(hovered) {
+  if (isProcessing) return;
+  isDragging = hovered;
+  setState(hovered ? 'hover' : 'standby');
+}
+
 function registerDragDrop() {
-  listen('tauri://drag-enter', () => {
-    if (!isProcessing) {
-      isDragging = true;
-      setState('hover');
-    }
-  });
+  listen('tauri://drag-enter', () => setDragHover(true));
 
-  listen('tauri://drag-over', () => {
-    if (!isProcessing && !isDragging) {
-      isDragging = true;
-      setState('hover');
-    }
-  });
+  listen('tauri://drag-over', () => { if (!isDragging) setDragHover(true); });
 
-  listen('tauri://drag-leave', () => {
-    if (!isProcessing) {
-      isDragging = false;
-      setState('standby');
-    }
-  });
+  listen('tauri://drag-leave', () => setDragHover(false));
 
   listen('tauri://drag-drop', (event) => {
     isDragging = false;

@@ -46,6 +46,17 @@ pub struct FileResult {
     pub error: Option<String>,
 }
 
+impl FileResult {
+    fn error(input_path: impl Into<String>, msg: impl Into<String>) -> Self {
+        Self {
+            input_path: input_path.into(),
+            output_path: String::new(),
+            success: false,
+            error: Some(msg.into()),
+        }
+    }
+}
+
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct CompletionPayload {
@@ -65,23 +76,18 @@ struct FileInfo {
 
 // --- FFmpeg/FFprobe path resolution ---
 
-fn ffmpeg_path() -> String {
-    for p in ["/opt/homebrew/bin/ffmpeg", "/usr/local/bin/ffmpeg"] {
-        if Path::new(p).exists() {
-            return p.to_string();
+fn resolve_binary(name: &str) -> String {
+    for dir in ["/opt/homebrew/bin/", "/usr/local/bin/"] {
+        let path = format!("{}{}", dir, name);
+        if Path::new(&path).exists() {
+            return path;
         }
     }
-    "ffmpeg".to_string()
+    name.to_string()
 }
 
-fn ffprobe_path() -> String {
-    for p in ["/opt/homebrew/bin/ffprobe", "/usr/local/bin/ffprobe"] {
-        if Path::new(p).exists() {
-            return p.to_string();
-        }
-    }
-    "ffprobe".to_string()
-}
+fn ffmpeg_path() -> String { resolve_binary("ffmpeg") }
+fn ffprobe_path() -> String { resolve_binary("ffprobe") }
 
 // --- File collection ---
 
@@ -522,7 +528,7 @@ pub async fn run_conversion(
     let all_paths = collect_audio_files(&request.paths);
 
     if all_paths.is_empty() {
-        let _ = app.emit(
+        if app.emit(
             "conversion_complete",
             CompletionPayload {
                 job_id,
@@ -530,7 +536,9 @@ pub async fn run_conversion(
                 success_count: 0,
                 error_count: 0,
             },
-        );
+        ).is_err() {
+            eprintln!("emit conversion_complete failed");
+        }
         return;
     }
 
@@ -540,15 +548,10 @@ pub async fn run_conversion(
     for path in all_paths {
         match std::fs::metadata(&path) {
             Ok(meta) if meta.len() > MAX_FILE_SIZE => {
-                skip_results.push(FileResult {
-                    input_path: path.to_string_lossy().into(),
-                    output_path: String::new(),
-                    success: false,
-                    error: Some(format!(
-                        "File size exceeds 10 GiB limit ({:.1} GiB)",
-                        meta.len() as f64 / 1_073_741_824.0
-                    )),
-                });
+                skip_results.push(FileResult::error(
+                    path.to_string_lossy(),
+                    format!("File size exceeds 10 GiB limit ({:.1} GiB)", meta.len() as f64 / 1_073_741_824.0),
+                ));
             }
             _ => file_paths.push(path),
         }
@@ -558,7 +561,7 @@ pub async fn run_conversion(
 
     if file_count == 0 {
         let error_count = skip_results.len();
-        let _ = app.emit(
+        if app.emit(
             "conversion_complete",
             CompletionPayload {
                 job_id,
@@ -566,7 +569,9 @@ pub async fn run_conversion(
                 success_count: 0,
                 error_count,
             },
-        );
+        ).is_err() {
+            eprintln!("emit conversion_complete failed");
+        }
         return;
     }
 
@@ -606,6 +611,8 @@ pub async fn run_conversion(
         None
     };
 
+    let settings = Arc::new(settings);
+    let job_id = Arc::new(job_id);
     let sem = Arc::new(Semaphore::new(settings.parallel_count.max(1)));
     let mut join_set: JoinSet<FileResult> = JoinSet::new();
 
@@ -626,14 +633,7 @@ pub async fn run_conversion(
 
             let output_path = match resolve_output_path(&input_path, &format, &settings, base_dir.as_deref()) {
                 Ok(p) => p,
-                Err(e) => {
-                    return FileResult {
-                        input_path: input_path.to_string_lossy().into(),
-                        output_path: String::new(),
-                        success: false,
-                        error: Some(e.to_string()),
-                    }
-                }
+                Err(e) => return FileResult::error(input_path.to_string_lossy(), e.to_string()),
             };
 
             let app2 = app.clone();
@@ -658,22 +658,24 @@ pub async fn run_conversion(
                     let progress_secs = progress_secs2.clone();
                     let name = input_display.clone();
                     tokio::spawn(async move {
-                        {
+                        let percent = {
                             let mut ps = progress_secs.lock().await;
                             ps[i] = secs;
-                        }
-                        let completed: f64 = progress_secs.lock().await.iter().sum();
-                        let percent = (completed / total_duration * 100.0).min(100.0);
-                        let _ = app.emit(
+                            let completed: f64 = ps.iter().sum();
+                            (completed / total_duration * 100.0).min(100.0)
+                        };
+                        if app.emit(
                             "progress",
                             ProgressPayload {
-                                job_id,
+                                job_id: (*job_id).clone(),
                                 percent,
                                 current_file: name,
                                 file_index: i,
                                 file_count,
                             },
-                        );
+                        ).is_err() {
+                            eprintln!("emit progress failed");
+                        }
                     });
                 },
                 move |pid| {
@@ -710,12 +712,7 @@ pub async fn run_conversion(
     while let Some(res) = join_set.join_next().await {
         match res {
             Ok(r) => results.push(r),
-            Err(e) => results.push(FileResult {
-                input_path: String::new(),
-                output_path: String::new(),
-                success: false,
-                error: Some(e.to_string()),
-            }),
+            Err(e) => results.push(FileResult::error("", e.to_string())),
         }
     }
 
@@ -733,24 +730,28 @@ pub async fn run_conversion(
     }
 
     // Emit final 100% progress before switching to standby
-    let _ = app.emit(
+    if app.emit(
         "progress",
         ProgressPayload {
-            job_id: job_id.clone(),
+            job_id: (*job_id).clone(),
             percent: 100.0,
             current_file: String::new(),
             file_index: file_count,
             file_count,
         },
-    );
+    ).is_err() {
+        eprintln!("emit progress failed");
+    }
 
-    let _ = app.emit(
+    if app.emit(
         "conversion_complete",
         CompletionPayload {
-            job_id,
+            job_id: (*job_id).clone(),
             results,
             success_count,
             error_count,
         },
-    );
+    ).is_err() {
+        eprintln!("emit conversion_complete failed");
+    }
 }
