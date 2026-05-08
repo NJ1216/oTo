@@ -13,6 +13,7 @@ let isDragging = false;
 let toastTimeout = null;
 let activeJobId = null;
 let jobCancelled = false;
+let currentDecodeFormat = 'wav';
 
 // --- DOM refs ---
 const bgContainer = document.getElementById('bg-container');
@@ -40,6 +41,7 @@ async function init() {
 
   currentMode = appSettings.lastMode || 'encode';
   currentFormat = appSettings.lastFormat || 'mp3';
+  currentDecodeFormat = appSettings.lastDecodeFormat || 'wav';
 
   await initSVGController(bgContainer, currentFormat, currentMode);
 
@@ -83,12 +85,22 @@ async function init() {
 function applyModeToUI() {
   toggle.checked = currentMode === 'decode';
   setMode(currentMode);
+  formatSelector.style.display = 'flex';
 
   if (currentMode === 'decode') {
-    formatSelector.style.display = 'none';
+    document.querySelectorAll('.fmt-btn').forEach((b) => (b.style.display = 'none'));
+    document.querySelectorAll('.decode-fmt-btn').forEach((b) => (b.style.display = ''));
+    applyDecodeFormatToUI();
   } else {
-    formatSelector.style.display = 'flex';
+    document.querySelectorAll('.decode-fmt-btn').forEach((b) => (b.style.display = 'none'));
+    applyFormatToUI();
   }
+}
+
+function applyDecodeFormatToUI() {
+  document.querySelectorAll('.decode-fmt-btn').forEach((btn) => {
+    btn.classList.toggle('active', btn.dataset.fmt === currentDecodeFormat);
+  });
 }
 
 function applyFormatToUI() {
@@ -114,6 +126,7 @@ function saveLastSettings() {
   if (!appSettings) return;
   appSettings.lastMode = currentMode;
   appSettings.lastFormat = currentFormat;
+  appSettings.lastDecodeFormat = currentDecodeFormat;
   invoke('save_settings', { s: appSettings }).catch(() => {});
 }
 
@@ -129,6 +142,14 @@ document.querySelectorAll('.fmt-btn').forEach((btn) => {
   btn.addEventListener('click', () => {
     currentFormat = btn.dataset.fmt;
     applyFormatToUI();
+    saveLastSettings();
+  });
+});
+
+document.querySelectorAll('.decode-fmt-btn').forEach((btn) => {
+  btn.addEventListener('click', () => {
+    currentDecodeFormat = btn.dataset.fmt;
+    applyDecodeFormatToUI();
     saveLastSettings();
   });
 });
@@ -182,7 +203,7 @@ async function startConversion(paths) {
       request: {
         paths,
         mode: currentMode,
-        format: currentFormat,
+        format: currentMode === 'decode' ? currentDecodeFormat : currentFormat,
       },
     });
   } catch (e) {

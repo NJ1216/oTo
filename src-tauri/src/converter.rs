@@ -13,7 +13,8 @@ use walkdir::WalkDir;
 use crate::settings::{NameConflict, OutputDest, Settings, SourceFileAction};
 
 const SUPPORTED_EXTS: &[&str] = &[
-    "wav", "mp3", "m4a", "aac", "flac", "mp4", "ogg", "opus", "wma", "aiff", "aif", "alac",
+    "wav", "mp3", "m4a", "aac", "flac", "alac", "ogg", "opus", "aiff", "aif", "wma",
+    "mp4", "mov", "mkv", "avi",
 ];
 
 const MAX_FILE_SIZE: u64 = 10 * 1024 * 1024 * 1024; // 10 GiB
@@ -223,7 +224,9 @@ fn resolve_output_path(
 
     std::fs::create_dir_all(&output_dir)?;
 
-    let filename = format!("{}.{}", stem, format);
+    // ALAC は M4A コンテナを使う
+    let ext = if format == "alac" { "m4a" } else { format };
+    let filename = format!("{}.{}", stem, ext);
     let candidate = output_dir.join(&filename);
 
     if !candidate.exists() || settings.name_conflict == NameConflict::ForceOverwrite {
@@ -250,12 +253,23 @@ fn resolve_output_path(
 
 fn build_codec_args(format: &str, settings: &Settings, info: &FileInfo) -> Vec<String> {
     match format {
-        "mp3" => vec![
-            "-c:a".into(),
-            "libmp3lame".into(),
-            "-b:a".into(),
-            format!("{}k", settings.mp3_bitrate),
-        ],
+        "mp3" => {
+            let mut args = vec![
+                "-c:a".into(),
+                "libmp3lame".into(),
+                "-b:a".into(),
+                format!("{}k", settings.mp3_bitrate),
+            ];
+            if settings.mp3_sample_rate > 0 {
+                args.extend(["-ar".into(), settings.mp3_sample_rate.to_string()]);
+            }
+            match settings.mp3_channel_mode.as_str() {
+                "mono" => args.extend(["-ac".into(), "1".into()]),
+                "stereo" => args.extend(["-ac".into(), "2".into()]),
+                _ => {}
+            }
+            args
+        }
         "m4a" => vec![
             "-c:a".into(),
             "aac".into(),
@@ -268,11 +282,32 @@ fn build_codec_args(format: &str, settings: &Settings, info: &FileInfo) -> Vec<S
             "-compression_level".into(),
             settings.flac_compression.to_string(),
         ],
+        "alac" => vec!["-c:a".into(), "alac".into()],
+        "ogg" => vec![
+            "-c:a".into(),
+            "libvorbis".into(),
+            "-q:a".into(),
+            "4".into(),
+        ],
+        "opus" => vec![
+            "-c:a".into(),
+            "libopus".into(),
+            "-b:a".into(),
+            "128k".into(),
+        ],
         "wav" => {
             let pcm_codec = match info.bits_per_sample {
                 24 => "pcm_s24le",
                 32 => "pcm_s32le",
                 _ => "pcm_s16le",
+            };
+            vec!["-c:a".into(), pcm_codec.into()]
+        }
+        "aiff" => {
+            let pcm_codec = match info.bits_per_sample {
+                24 => "pcm_s24be",
+                32 => "pcm_s32be",
+                _ => "pcm_s16be",
             };
             vec!["-c:a".into(), pcm_codec.into()]
         }
@@ -416,7 +451,11 @@ pub async fn run_conversion(
     pgids: Arc<tokio::sync::Mutex<Vec<i32>>>,
 ) {
     let format = if request.mode == "decode" {
-        "wav".to_string()
+        // DECODE モードは wav または aiff のみ許可、それ以外はデフォルト wav
+        match request.format.as_str() {
+            "aiff" => "aiff".to_string(),
+            _ => "wav".to_string(),
+        }
     } else {
         request.format.clone()
     };

@@ -80,6 +80,33 @@
       </div>
     </section>
 
+    <!-- MP3 詳細設定 -->
+    <section class="section">
+      <details id="mp3-detail">
+        <summary data-i18n="settings.mp3detail.title">MP3 詳細設定</summary>
+        <div class="quality-grid detail-grid">
+          <label data-i18n="settings.mp3detail.sampleRate">サンプルレート</label>
+          <div class="select-wrap">
+            <select id="mp3SampleRate">
+              <option value="0" data-i18n="settings.mp3detail.sampleRateAuto">自動</option>
+              <option value="44100">44.1 kHz</option>
+              <option value="48000">48 kHz</option>
+              <option value="88200">88.2 kHz</option>
+              <option value="96000">96 kHz</option>
+            </select>
+          </div>
+          <label data-i18n="settings.mp3detail.channelMode">チャンネル</label>
+          <div class="select-wrap">
+            <select id="mp3ChannelMode">
+              <option value="joint_stereo" data-i18n="settings.mp3detail.jointStereo">Joint Stereo（デフォルト）</option>
+              <option value="stereo" data-i18n="settings.mp3detail.stereo">Stereo</option>
+              <option value="mono" data-i18n="settings.mp3detail.mono">Mono</option>
+            </select>
+          </div>
+        </div>
+      </details>
+    </section>
+
     <!-- 並列変換 -->
     <section class="section">
       <h2 data-i18n="settings.parallel.title">並列変換</h2>
@@ -102,6 +129,9 @@
         <label class="checkbox-row"><input type="checkbox" class="fmt-check" data-fmt="mp3" /> <span>MP3</span></label>
         <label class="checkbox-row"><input type="checkbox" class="fmt-check" data-fmt="m4a" /> <span>M4A</span></label>
         <label class="checkbox-row"><input type="checkbox" class="fmt-check" data-fmt="flac" /> <span>FLAC</span></label>
+        <label class="checkbox-row"><input type="checkbox" class="fmt-check" data-fmt="alac" /> <span>ALAC</span></label>
+        <label class="checkbox-row"><input type="checkbox" class="fmt-check" data-fmt="ogg" /> <span>OGG</span></label>
+        <label class="checkbox-row"><input type="checkbox" class="fmt-check" data-fmt="opus" /> <span>OPUS</span></label>
       </div>
       <p class="format-hint" data-i18n="settings.formats.hint">メインウィンドウに表示する変換形式を選択（最低1つ必要）</p>
     </section>

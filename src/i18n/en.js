@@ -75,6 +75,15 @@ export default {
       title: 'Visible Formats',
       hint: 'Choose which formats appear in the main window (at least one required)',
     },
+    mp3detail: {
+      title: 'MP3 Advanced',
+      sampleRate: 'Sample Rate',
+      sampleRateAuto: 'Auto',
+      channelMode: 'Channel',
+      jointStereo: 'Joint Stereo (default)',
+      stereo: 'Stereo',
+      mono: 'Mono',
+    },
     misc: {
       title: 'Other',
       reveal: 'Open output folder after conversion',

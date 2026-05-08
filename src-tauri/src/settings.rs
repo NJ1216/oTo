@@ -31,6 +31,14 @@ fn default_enabled_formats() -> Vec<String> {
     vec!["mp3".into(), "m4a".into(), "flac".into()]
 }
 
+fn default_mp3_channel_mode() -> String {
+    "joint_stereo".into()
+}
+
+fn default_last_decode_format() -> String {
+    "wav".into()
+}
+
 fn calc_parallel_count(full_power: bool) -> usize {
     let cpu_count = std::thread::available_parallelism()
         .map(|n| n.get())
@@ -45,6 +53,10 @@ pub struct Settings {
     pub source_file_action: SourceFileAction,
     pub name_conflict: NameConflict,
     pub mp3_bitrate: u32,
+    #[serde(default)]
+    pub mp3_sample_rate: u32,
+    #[serde(default = "default_mp3_channel_mode")]
+    pub mp3_channel_mode: String,
     pub m4a_bitrate: u32,
     pub flac_compression: u8,
     /// full_power から動的計算される。settings.json には保存しない。
@@ -55,6 +67,8 @@ pub struct Settings {
     pub open_in_finder: bool,
     pub last_mode: String,
     pub last_format: String,
+    #[serde(default = "default_last_decode_format")]
+    pub last_decode_format: String,
     pub custom_output_path: Option<String>,
     #[serde(default)]
     pub language: String,
@@ -69,6 +83,8 @@ impl Default for Settings {
             source_file_action: SourceFileAction::Keep,
             name_conflict: NameConflict::AutoRename,
             mp3_bitrate: 192,
+            mp3_sample_rate: 0,
+            mp3_channel_mode: default_mp3_channel_mode(),
             m4a_bitrate: 128,
             flac_compression: 5,
             parallel_count: calc_parallel_count(false),
@@ -76,6 +92,7 @@ impl Default for Settings {
             open_in_finder: false,
             last_mode: "encode".into(),
             last_format: "mp3".into(),
+            last_decode_format: default_last_decode_format(),
             custom_output_path: None,
             language: String::new(),
             enabled_formats: default_enabled_formats(),

@@ -37,6 +37,10 @@ function populateForm(s) {
   document.getElementById('m4aBitrate').value = String(s.m4aBitrate);
   document.getElementById('flacCompression').value = String(s.flacCompression);
 
+  // MP3 詳細設定
+  document.getElementById('mp3SampleRate').value = String(s.mp3SampleRate ?? 0);
+  document.getElementById('mp3ChannelMode').value = s.mp3ChannelMode || 'joint_stereo';
+
   // Full power toggle
   document.getElementById('fullPower').checked = !!s.fullPower;
 
@@ -90,6 +94,8 @@ document.getElementById('save-btn').addEventListener('click', async () => {
     sourceFileAction: sourceFileAction || 'keep',
     nameConflict: nameConflict || 'auto_rename',
     mp3Bitrate: parseInt(document.getElementById('mp3Bitrate').value, 10),
+    mp3SampleRate: parseInt(document.getElementById('mp3SampleRate').value, 10),
+    mp3ChannelMode: document.getElementById('mp3ChannelMode').value,
     m4aBitrate: parseInt(document.getElementById('m4aBitrate').value, 10),
     flacCompression: parseInt(document.getElementById('flacCompression').value, 10),
     fullPower: document.getElementById('fullPower').checked,

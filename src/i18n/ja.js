@@ -75,6 +75,15 @@ export default {
       title: '表示フォーマット',
       hint: 'メインウィンドウに表示する変換形式（最低1つ必要）',
     },
+    mp3detail: {
+      title: 'MP3 詳細設定',
+      sampleRate: 'サンプルレート',
+      sampleRateAuto: '自動',
+      channelMode: 'チャンネル',
+      jointStereo: 'Joint Stereo（デフォルト）',
+      stereo: 'Stereo',
+      mono: 'Mono',
+    },
     misc: {
       title: 'その他',
       reveal: '変換完了後に出力先を開く',
