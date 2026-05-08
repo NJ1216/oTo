@@ -66,7 +66,14 @@ export default {
     },
     parallel: {
       title: '並列変換',
-      count: '同時実行数',
+      fullPower: {
+        label: 'フルパワー処理',
+        hint: 'OFF: CPUコア数−1（推奨）　ON: 全コア使用',
+      },
+    },
+    formats: {
+      title: '表示フォーマット',
+      hint: 'メインウィンドウに表示する変換形式（最低1つ必要）',
     },
     misc: {
       title: 'その他',

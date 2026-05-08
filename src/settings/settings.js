@@ -37,8 +37,14 @@ function populateForm(s) {
   document.getElementById('m4aBitrate').value = String(s.m4aBitrate);
   document.getElementById('flacCompression').value = String(s.flacCompression);
 
-  // Parallel count
-  document.getElementById('parallelCount').value = String(s.parallelCount);
+  // Full power toggle
+  document.getElementById('fullPower').checked = !!s.fullPower;
+
+  // Enabled formats
+  const enabled = s.enabledFormats || ['mp3', 'm4a', 'flac'];
+  document.querySelectorAll('.fmt-check').forEach((cb) => {
+    cb.checked = enabled.includes(cb.dataset.fmt);
+  });
 
   // Open in Finder
   document.getElementById('openInFinder').checked = s.openInFinder;
@@ -86,10 +92,14 @@ document.getElementById('save-btn').addEventListener('click', async () => {
     mp3Bitrate: parseInt(document.getElementById('mp3Bitrate').value, 10),
     m4aBitrate: parseInt(document.getElementById('m4aBitrate').value, 10),
     flacCompression: parseInt(document.getElementById('flacCompression').value, 10),
-    parallelCount: Math.max(1, parseInt(document.getElementById('parallelCount').value, 10) || 1),
+    fullPower: document.getElementById('fullPower').checked,
     openInFinder: document.getElementById('openInFinder').checked,
     customOutputPath: customPath,
     language: document.getElementById('language').value,
+    enabledFormats: (() => {
+      const checked = [...document.querySelectorAll('.fmt-check:checked')].map((cb) => cb.dataset.fmt);
+      return checked.length > 0 ? checked : ['mp3'];
+    })(),
   };
 
   await invoke('save_settings', { s: updated });

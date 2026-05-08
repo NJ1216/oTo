@@ -75,6 +75,7 @@ async function init() {
   await listen('settings_updated', async () => {
     appSettings = await invoke('get_settings');
     await initI18n(appSettings.language || '');
+    applyFormatToUI();
   });
 }
 
@@ -91,9 +92,21 @@ function applyModeToUI() {
 }
 
 function applyFormatToUI() {
+  const enabled = appSettings?.enabledFormats || ['mp3', 'm4a', 'flac'];
+
   document.querySelectorAll('.fmt-btn').forEach((btn) => {
+    btn.style.display = enabled.includes(btn.dataset.fmt) ? '' : 'none';
     btn.classList.toggle('active', btn.dataset.fmt === currentFormat);
   });
+
+  // currentFormat が非表示になった場合は最初の有効フォーマットに切り替え
+  if (!enabled.includes(currentFormat)) {
+    currentFormat = enabled[0] || 'mp3';
+    document.querySelectorAll('.fmt-btn').forEach((btn) => {
+      btn.classList.toggle('active', btn.dataset.fmt === currentFormat);
+    });
+  }
+
   setFormat(currentFormat);
 }
 

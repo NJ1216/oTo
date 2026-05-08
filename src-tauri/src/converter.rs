@@ -296,7 +296,7 @@ async fn convert_one(
     let mut args: Vec<String> = vec![
         "-y".into(),
         "-i".into(),
-        input.to_str().unwrap().to_string(),
+        input.to_string_lossy().into_owned(),
         "-map_metadata".into(),
         "0".into(),
         "-map".into(),
@@ -331,7 +331,7 @@ async fn convert_one(
     args.push("pipe:1".into());
     args.push("-nostats".into());
 
-    args.push(output.to_str().unwrap().to_string());
+    args.push(output.to_string_lossy().into_owned());
 
     let mut cmd = tokio::process::Command::new(&ffmpeg);
     cmd.args(&args)

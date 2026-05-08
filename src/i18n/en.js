@@ -66,7 +66,14 @@ export default {
     },
     parallel: {
       title: 'Parallel Conversion',
-      count: 'Concurrent jobs',
+      fullPower: {
+        label: 'Full Power',
+        hint: 'OFF: CPU cores−1 (recommended)　ON: use all cores',
+      },
+    },
+    formats: {
+      title: 'Visible Formats',
+      hint: 'Choose which formats appear in the main window (at least one required)',
     },
     misc: {
       title: 'Other',
