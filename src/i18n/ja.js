@@ -18,6 +18,7 @@ export default {
       partial: '{ok}件成功 / {err}件失敗 — DevToolsで詳細確認',
     },
     error: 'エラー: {msg}',
+    missingLibvorbis: 'OGGにはlibvorbisが必要です。brew reinstall ffmpeg を実行してください。',
   },
   settings: {
     title: '設定',

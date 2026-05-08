@@ -18,6 +18,7 @@ export default {
       partial: '{ok} succeeded / {err} failed — see DevTools for details',
     },
     error: 'Error: {msg}',
+    missingLibvorbis: 'OGG requires libvorbis. Run: brew reinstall ffmpeg',
   },
   settings: {
     title: 'Settings',

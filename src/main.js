@@ -231,6 +231,13 @@ function showCompletionToast(successCount, errorCount, results) {
     console.error(`[oTo] 変換失敗: ${r.inputPath}\n${r.error}`);
   });
 
+  // 特定エンコーダー欠落エラーを優先表示
+  const hasMissingLibvorbis = results?.some((r) => !r.success && r.error?.includes('MISSING_ENCODER:libvorbis'));
+  if (hasMissingLibvorbis) {
+    showToast(t('toast.missingLibvorbis'), 'error', 7000);
+    return;
+  }
+
   if (successCount === 0) {
     showToast(t('toast.fail.all', { n: errorCount }), 'error');
   } else {
@@ -238,13 +245,13 @@ function showCompletionToast(successCount, errorCount, results) {
   }
 }
 
-function showToast(message, type = 'success') {
+function showToast(message, type = 'success', duration = 2000) {
   clearTimeout(toastTimeout);
   toast.textContent = message;
   toast.className = `toast ${type} visible`;
   toastTimeout = setTimeout(() => {
     toast.classList.remove('visible');
-  }, 2000);
+  }, duration);
 }
 
 // --- Context menu ---

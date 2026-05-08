@@ -473,6 +473,12 @@ async fn convert_one(
     };
 
     if !status.success() {
+        // libvorbis が FFmpeg にコンパイルされていない場合の専用エラー
+        if stderr_text.contains("libvorbis")
+            && (stderr_text.contains("Unknown encoder") || stderr_text.contains("Encoder not found"))
+        {
+            return Err(anyhow!("MISSING_ENCODER:libvorbis"));
+        }
         let tail: String = stderr_text
             .lines()
             .filter(|l| !l.trim().is_empty())
