@@ -28,6 +28,7 @@ export default {
       downloads: 'Downloads',
       custom: 'Custom folder',
       pick: 'Browse…',
+      preserveStructure: 'Preserve folder structure',
     },
     source: {
       title: 'Source File',

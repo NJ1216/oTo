@@ -114,6 +114,20 @@ pub fn collect_audio_files(paths: &[String]) -> Vec<PathBuf> {
     files
 }
 
+fn common_ancestor(paths: &[PathBuf]) -> Option<PathBuf> {
+    let dirs: Vec<&Path> = paths.iter().filter_map(|p| p.parent()).collect();
+    if dirs.is_empty() {
+        return None;
+    }
+    let mut ancestor = dirs[0].to_path_buf();
+    for dir in &dirs[1..] {
+        while !dir.starts_with(&ancestor) {
+            ancestor = ancestor.parent()?.to_path_buf();
+        }
+    }
+    Some(ancestor)
+}
+
 // --- FFprobe info ---
 
 async fn probe_file(path: &Path) -> FileInfo {
@@ -198,13 +212,14 @@ fn resolve_output_path(
     input: &Path,
     format: &str,
     settings: &Settings,
+    base_dir: Option<&Path>,
 ) -> Result<PathBuf> {
     let stem = input
         .file_stem()
         .ok_or_else(|| anyhow!("invalid filename"))?
         .to_string_lossy();
 
-    let output_dir = match &settings.output_dest {
+    let mut output_dir = match &settings.output_dest {
         OutputDest::SourceFolder => input
             .parent()
             .ok_or_else(|| anyhow!("no parent dir"))?
@@ -221,6 +236,14 @@ fn resolve_output_path(
             PathBuf::from(p)
         }
     };
+
+    if settings.preserve_folder_structure && settings.output_dest != OutputDest::SourceFolder {
+        if let (Some(base), Some(parent)) = (base_dir, input.parent()) {
+            if let Ok(rel) = parent.strip_prefix(base) {
+                output_dir = output_dir.join(rel);
+            }
+        }
+    }
 
     std::fs::create_dir_all(&output_dir)?;
 
@@ -572,6 +595,14 @@ pub async fn run_conversion(
     // Shared progress state: each file's completed seconds
     let progress_secs = Arc::new(tokio::sync::Mutex::new(vec![0.0f64; file_count]));
 
+    let base_dir: Option<PathBuf> = if settings.preserve_folder_structure
+        && settings.output_dest != OutputDest::SourceFolder
+    {
+        common_ancestor(&file_paths)
+    } else {
+        None
+    };
+
     let sem = Arc::new(Semaphore::new(settings.parallel_count.max(1)));
     let mut join_set: JoinSet<FileResult> = JoinSet::new();
 
@@ -585,11 +616,12 @@ pub async fn run_conversion(
         let input_path = info.path.clone();
         let file_duration = info.duration_secs;
         let pgids_for_spawn = pgids.clone();
+        let base_dir = base_dir.clone();
 
         join_set.spawn(async move {
             let _permit = sem.acquire().await.unwrap();
 
-            let output_path = match resolve_output_path(&input_path, &format, &settings) {
+            let output_path = match resolve_output_path(&input_path, &format, &settings, base_dir.as_deref()) {
                 Ok(p) => p,
                 Err(e) => {
                     return FileResult {

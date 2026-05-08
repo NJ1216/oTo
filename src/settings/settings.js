@@ -15,12 +15,20 @@ async function init() {
   populateForm(settings);
 }
 
+function updatePreserveVisibility() {
+  const dest = document.querySelector('input[name="outputDest"]:checked')?.value;
+  const row = document.getElementById('preserve-structure-row');
+  if (row) row.style.display = dest === 'source_folder' ? 'none' : '';
+}
+
 function populateForm(s) {
   // Output destination
   const destVal = snakeCase(s.outputDest);
   const destRadio = document.querySelector(`input[name="outputDest"][value="${destVal}"]`);
   if (destRadio) destRadio.checked = true;
   updateCustomPathDisplay();
+  document.getElementById('preserveFolderStructure').checked = !!s.preserveFolderStructure;
+  updatePreserveVisibility();
 
   // Source file action
   const actionVal = snakeCase(s.sourceFileAction);
@@ -106,6 +114,11 @@ function toggleCustomDetail(selectId, show) {
   });
 });
 
+// Output dest radios — show/hide preserve structure option
+document.querySelectorAll('input[name="outputDest"]').forEach((r) => {
+  r.addEventListener('change', updatePreserveVisibility);
+});
+
 // CBR/VBR mode radios
 ['mp3', 'aac'].forEach((fmt) => {
   document.querySelectorAll(`input[name="${fmt}Mode"]`).forEach((r) => {
@@ -171,6 +184,7 @@ document.getElementById('save-btn').addEventListener('click', async () => {
     alacBitDepth: parseInt(document.getElementById('alacBitDepth').value, 10) || 16,
     fullPower: document.getElementById('fullPower').checked,
     openInFinder: document.getElementById('openInFinder').checked,
+    preserveFolderStructure: document.getElementById('preserveFolderStructure').checked,
     customOutputPath: customPath,
     language: document.getElementById('language').value,
     enabledFormats: (() => {

@@ -28,6 +28,7 @@ export default {
       downloads: 'ダウンロード',
       custom: '指定フォルダ',
       pick: '選択…',
+      preserveStructure: 'フォルダ構造を維持する',
     },
     source: {
       title: '元ファイルの扱い',

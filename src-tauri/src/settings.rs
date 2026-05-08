@@ -125,6 +125,8 @@ pub struct Settings {
     pub last_decode_format: String,
     pub custom_output_path: Option<String>,
     #[serde(default)]
+    pub preserve_folder_structure: bool,
+    #[serde(default)]
     pub language: String,
     #[serde(default = "default_enabled_formats")]
     pub enabled_formats: Vec<String>,
@@ -163,6 +165,7 @@ impl Default for Settings {
             last_format: "mp3".into(),
             last_decode_format: default_last_decode_format(),
             custom_output_path: None,
+            preserve_folder_structure: false,
             language: String::new(),
             enabled_formats: default_enabled_formats(),
         }
