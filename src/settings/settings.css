@@ -211,6 +211,32 @@ input[type="checkbox"] {
   font-size: 12px;
 }
 
+.custom-inner .full-row {
+  grid-column: 1 / -1;
+}
+
+.mode-row {
+  display: flex;
+  gap: 14px;
+  padding-bottom: 2px;
+}
+
+.mode-row label {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  color: rgba(255, 255, 255, 0.75);
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.inner-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px 12px;
+  align-items: center;
+}
+
 .custom-inner input[type="number"] {
   width: 100%;
   background: rgba(255, 255, 255, 0.07);

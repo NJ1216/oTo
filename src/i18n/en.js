@@ -95,6 +95,9 @@ export default {
       opusComplexity: 'Complexity (0–10)',
       flacLevel: 'Compression Level (0–8)',
       bitDepth: 'Bit Depth',
+      cbr: 'CBR (Constant Bitrate)',
+      vbr: 'VBR (Variable Bitrate)',
+      vbrQuality: 'VBR Quality',
     },
     parallel: {
       title: 'Parallel Conversion',

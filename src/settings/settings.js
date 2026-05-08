@@ -34,19 +34,33 @@ function populateForm(s) {
 
   // Quality presets
   setPreset('mp3Preset', s.mp3Preset || '192');
+  const mp3Mode = s.mp3Mode || 'cbr';
+  document.querySelectorAll('input[name="mp3Mode"]').forEach((r) => { r.checked = r.value === mp3Mode; });
+  toggleCbrVbr('mp3', mp3Mode);
   document.getElementById('mp3Bitrate').value = String(s.mp3Bitrate || 192);
+  document.getElementById('mp3VbrQuality').value = String(s.mp3VbrQuality ?? 4);
   document.getElementById('mp3SampleRate').value = String(s.mp3SampleRate ?? 0);
-  document.getElementById('mp3ChannelMode').value = s.mp3ChannelMode || 'joint_stereo';
+  document.getElementById('mp3ChannelMode').value = s.mp3ChannelMode || 'auto';
 
   setPreset('aacPreset', s.aacPreset || '128');
+  const aacMode = s.aacMode || 'cbr';
+  document.querySelectorAll('input[name="aacMode"]').forEach((r) => { r.checked = r.value === aacMode; });
+  toggleCbrVbr('aac', aacMode);
   document.getElementById('m4aBitrate').value = String(s.m4aBitrate || 128);
+  document.getElementById('aacVbrQuality').value = String(s.aacVbrQuality ?? 4);
   document.getElementById('aacSampleRate').value = String(s.aacSampleRate ?? 0);
   document.getElementById('aacChannels').value = String(s.aacChannels ?? 0);
 
   setPreset('oggPreset', s.oggPreset || 'q4');
+  const oggMode = s.oggMode || 'vbr';
+  document.querySelectorAll('input[name="oggMode"]').forEach((r) => { r.checked = r.value === oggMode; });
+  toggleCbrVbr('ogg', oggMode);
   document.getElementById('oggQuality').value = String(s.oggQuality ?? 4);
+  document.getElementById('oggCbrBitrate').value = String(s.oggCbrBitrate || 192);
 
   setPreset('opusPreset', s.opusPreset || '128');
+  const opusMode = s.opusMode || 'vbr';
+  document.querySelectorAll('input[name="opusMode"]').forEach((r) => { r.checked = r.value === opusMode; });
   document.getElementById('opusBitrate').value = String(s.opusBitrate || 128);
   document.getElementById('opusComplexity').value = String(s.opusComplexity ?? 5);
 
@@ -72,6 +86,13 @@ function populateForm(s) {
   document.getElementById('language').value = s.language || '';
 }
 
+function toggleCbrVbr(fmt, mode) {
+  const cbrEl = document.getElementById(`${fmt}CbrRows`);
+  const vbrEl = document.getElementById(`${fmt}VbrRows`);
+  if (cbrEl) cbrEl.style.display = mode === 'cbr' ? '' : 'none';
+  if (vbrEl) vbrEl.style.display = mode === 'vbr' ? '' : 'none';
+}
+
 function setPreset(selectId, value) {
   const el = document.getElementById(selectId);
   if (!el) return;
@@ -89,6 +110,13 @@ function toggleCustomDetail(selectId, show) {
 ['mp3Preset', 'aacPreset', 'oggPreset', 'opusPreset', 'flacPreset', 'alacPreset'].forEach((id) => {
   document.getElementById(id)?.addEventListener('change', (e) => {
     toggleCustomDetail(id, e.target.value === 'custom');
+  });
+});
+
+// CBR/VBR mode radios
+['mp3', 'aac', 'ogg'].forEach((fmt) => {
+  document.querySelectorAll(`input[name="${fmt}Mode"]`).forEach((r) => {
+    r.addEventListener('change', (e) => toggleCbrVbr(fmt, e.target.value));
   });
 });
 
@@ -129,16 +157,23 @@ document.getElementById('save-btn').addEventListener('click', async () => {
     sourceFileAction: sourceFileAction || 'keep',
     nameConflict: nameConflict || 'auto_rename',
     mp3Preset: document.getElementById('mp3Preset').value,
+    mp3Mode: document.querySelector('input[name="mp3Mode"]:checked')?.value || 'cbr',
     mp3Bitrate: parseInt(document.getElementById('mp3Bitrate').value, 10) || 192,
+    mp3VbrQuality: parseInt(document.getElementById('mp3VbrQuality').value, 10) ?? 4,
     mp3SampleRate: parseInt(document.getElementById('mp3SampleRate').value, 10),
     mp3ChannelMode: document.getElementById('mp3ChannelMode').value,
     aacPreset: document.getElementById('aacPreset').value,
+    aacMode: document.querySelector('input[name="aacMode"]:checked')?.value || 'cbr',
     m4aBitrate: parseInt(document.getElementById('m4aBitrate').value, 10) || 128,
+    aacVbrQuality: parseInt(document.getElementById('aacVbrQuality').value, 10) ?? 4,
     aacSampleRate: parseInt(document.getElementById('aacSampleRate').value, 10),
     aacChannels: parseInt(document.getElementById('aacChannels').value, 10),
     oggPreset: document.getElementById('oggPreset').value,
-    oggQuality: parseFloat(document.getElementById('oggQuality').value) || 4,
+    oggMode: document.querySelector('input[name="oggMode"]:checked')?.value || 'vbr',
+    oggQuality: parseFloat(document.getElementById('oggQuality').value) ?? 4,
+    oggCbrBitrate: parseInt(document.getElementById('oggCbrBitrate').value, 10) || 192,
     opusPreset: document.getElementById('opusPreset').value,
+    opusMode: document.querySelector('input[name="opusMode"]:checked')?.value || 'vbr',
     opusBitrate: parseInt(document.getElementById('opusBitrate').value, 10) || 128,
     opusComplexity: parseInt(document.getElementById('opusComplexity').value, 10),
     flacPreset: document.getElementById('flacPreset').value,

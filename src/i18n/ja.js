@@ -95,6 +95,9 @@ export default {
       opusComplexity: '複雑度 (0–10)',
       flacLevel: '圧縮レベル (0–8)',
       bitDepth: 'ビット深度',
+      cbr: 'CBR（固定ビットレート）',
+      vbr: 'VBR（可変ビットレート）',
+      vbrQuality: 'VBR クオリティ',
     },
     parallel: {
       title: '並列変換',

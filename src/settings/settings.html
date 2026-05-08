@@ -62,8 +62,48 @@
         </div>
         <div class="custom-detail" id="mp3Custom">
           <div class="custom-inner">
-            <label data-i18n="settings.custom.bitrate">ビットレート (kbps)</label>
-            <input type="number" id="mp3Bitrate" min="32" max="320" value="192" />
+            <div class="full-row mode-row">
+              <label><input type="radio" name="mp3Mode" value="cbr" checked /> <span data-i18n="settings.custom.cbr">CBR</span></label>
+              <label><input type="radio" name="mp3Mode" value="vbr" /> <span data-i18n="settings.custom.vbr">VBR</span></label>
+            </div>
+            <div id="mp3CbrRows" class="full-row inner-grid">
+              <label data-i18n="settings.custom.bitrate">ビットレート (kbps)</label>
+              <div class="select-wrap">
+                <select id="mp3Bitrate">
+                  <option value="32">32 kbps</option>
+                  <option value="40">40 kbps</option>
+                  <option value="48">48 kbps</option>
+                  <option value="56">56 kbps</option>
+                  <option value="64">64 kbps</option>
+                  <option value="80">80 kbps</option>
+                  <option value="96">96 kbps</option>
+                  <option value="112">112 kbps</option>
+                  <option value="128">128 kbps</option>
+                  <option value="160">160 kbps</option>
+                  <option value="192">192 kbps</option>
+                  <option value="224">224 kbps</option>
+                  <option value="256">256 kbps</option>
+                  <option value="320">320 kbps</option>
+                </select>
+              </div>
+            </div>
+            <div id="mp3VbrRows" class="full-row inner-grid" style="display:none">
+              <label data-i18n="settings.custom.vbrQuality">VBR Quality</label>
+              <div class="select-wrap">
+                <select id="mp3VbrQuality">
+                  <option value="0">V0 (best)</option>
+                  <option value="1">V1</option>
+                  <option value="2">V2</option>
+                  <option value="3">V3</option>
+                  <option value="4">V4</option>
+                  <option value="5">V5</option>
+                  <option value="6">V6</option>
+                  <option value="7">V7</option>
+                  <option value="8">V8</option>
+                  <option value="9">V9 (smallest)</option>
+                </select>
+              </div>
+            </div>
             <label data-i18n="settings.custom.sampleRate">サンプルレート</label>
             <div class="select-wrap">
               <select id="mp3SampleRate">
@@ -77,6 +117,7 @@
             <label data-i18n="settings.custom.channel">チャンネル</label>
             <div class="select-wrap">
               <select id="mp3ChannelMode">
+                <option value="auto" data-i18n="settings.custom.auto">自動</option>
                 <option value="joint_stereo" data-i18n="settings.custom.jointStereo">Joint Stereo</option>
                 <option value="stereo" data-i18n="settings.custom.stereo">Stereo</option>
                 <option value="mono" data-i18n="settings.custom.mono">Mono</option>
@@ -98,8 +139,41 @@
         </div>
         <div class="custom-detail" id="aacCustom">
           <div class="custom-inner">
-            <label data-i18n="settings.custom.bitrate">ビットレート (kbps)</label>
-            <input type="number" id="m4aBitrate" min="32" max="320" value="128" />
+            <div class="full-row mode-row">
+              <label><input type="radio" name="aacMode" value="cbr" checked /> <span data-i18n="settings.custom.cbr">CBR</span></label>
+              <label><input type="radio" name="aacMode" value="vbr" /> <span data-i18n="settings.custom.vbr">VBR</span></label>
+            </div>
+            <div id="aacCbrRows" class="full-row inner-grid">
+              <label data-i18n="settings.custom.bitrate">ビットレート (kbps)</label>
+              <div class="select-wrap">
+                <select id="m4aBitrate">
+                  <option value="32">32 kbps</option>
+                  <option value="48">48 kbps</option>
+                  <option value="64">64 kbps</option>
+                  <option value="80">80 kbps</option>
+                  <option value="96">96 kbps</option>
+                  <option value="112">112 kbps</option>
+                  <option value="128">128 kbps</option>
+                  <option value="160">160 kbps</option>
+                  <option value="192">192 kbps</option>
+                  <option value="224">224 kbps</option>
+                  <option value="256">256 kbps</option>
+                  <option value="320">320 kbps</option>
+                </select>
+              </div>
+            </div>
+            <div id="aacVbrRows" class="full-row inner-grid" style="display:none">
+              <label data-i18n="settings.custom.vbrQuality">VBR Quality</label>
+              <div class="select-wrap">
+                <select id="aacVbrQuality">
+                  <option value="1">1 (low)</option>
+                  <option value="2">2</option>
+                  <option value="3">3</option>
+                  <option value="4">4</option>
+                  <option value="5">5 (high)</option>
+                </select>
+              </div>
+            </div>
             <label data-i18n="settings.custom.sampleRate">サンプルレート</label>
             <div class="select-wrap">
               <select id="aacSampleRate">
@@ -132,8 +206,46 @@
         </div>
         <div class="custom-detail" id="oggCustom">
           <div class="custom-inner">
-            <label data-i18n="settings.custom.oggQuality">クオリティ (0–10)</label>
-            <input type="number" id="oggQuality" min="0" max="10" step="0.1" value="4" />
+            <div class="full-row mode-row">
+              <label><input type="radio" name="oggMode" value="vbr" checked /> <span data-i18n="settings.custom.vbr">VBR</span></label>
+              <label><input type="radio" name="oggMode" value="cbr" /> <span data-i18n="settings.custom.cbr">CBR</span></label>
+            </div>
+            <div id="oggVbrRows" class="full-row inner-grid">
+              <label data-i18n="settings.custom.oggQuality">クオリティ (0–10)</label>
+              <div class="select-wrap">
+                <select id="oggQuality">
+                  <option value="-1">-1 (very low)</option>
+                  <option value="0">0</option>
+                  <option value="1">1</option>
+                  <option value="2">2</option>
+                  <option value="3">3</option>
+                  <option value="4">4</option>
+                  <option value="5">5</option>
+                  <option value="6">6</option>
+                  <option value="7">7</option>
+                  <option value="8">8</option>
+                  <option value="9">9</option>
+                  <option value="10">10 (best)</option>
+                </select>
+              </div>
+            </div>
+            <div id="oggCbrRows" class="full-row inner-grid" style="display:none">
+              <label data-i18n="settings.custom.bitrate">ビットレート (kbps)</label>
+              <div class="select-wrap">
+                <select id="oggCbrBitrate">
+                  <option value="64">64 kbps</option>
+                  <option value="80">80 kbps</option>
+                  <option value="96">96 kbps</option>
+                  <option value="112">112 kbps</option>
+                  <option value="128">128 kbps</option>
+                  <option value="160">160 kbps</option>
+                  <option value="192">192 kbps</option>
+                  <option value="224">224 kbps</option>
+                  <option value="256">256 kbps</option>
+                  <option value="320">320 kbps</option>
+                </select>
+              </div>
+            </div>
           </div>
         </div>
 
@@ -150,10 +262,43 @@
         </div>
         <div class="custom-detail" id="opusCustom">
           <div class="custom-inner">
+            <div class="full-row mode-row">
+              <label><input type="radio" name="opusMode" value="vbr" checked /> <span data-i18n="settings.custom.vbr">VBR</span></label>
+              <label><input type="radio" name="opusMode" value="cbr" /> <span data-i18n="settings.custom.cbr">CBR</span></label>
+            </div>
             <label data-i18n="settings.custom.bitrate">ビットレート (kbps)</label>
-            <input type="number" id="opusBitrate" min="6" max="510" value="128" />
+            <div class="select-wrap">
+              <select id="opusBitrate">
+                <option value="16">16 kbps</option>
+                <option value="24">24 kbps</option>
+                <option value="32">32 kbps</option>
+                <option value="48">48 kbps</option>
+                <option value="64">64 kbps</option>
+                <option value="80">80 kbps</option>
+                <option value="96">96 kbps</option>
+                <option value="128">128 kbps</option>
+                <option value="160">160 kbps</option>
+                <option value="192">192 kbps</option>
+                <option value="256">256 kbps</option>
+                <option value="320">320 kbps</option>
+              </select>
+            </div>
             <label data-i18n="settings.custom.opusComplexity">複雑度 (0–10)</label>
-            <input type="number" id="opusComplexity" min="0" max="10" value="5" />
+            <div class="select-wrap">
+              <select id="opusComplexity">
+                <option value="0">0</option>
+                <option value="1">1</option>
+                <option value="2">2</option>
+                <option value="3">3</option>
+                <option value="4">4</option>
+                <option value="5">5</option>
+                <option value="6">6</option>
+                <option value="7">7</option>
+                <option value="8">8</option>
+                <option value="9">9</option>
+                <option value="10">10</option>
+              </select>
+            </div>
           </div>
         </div>
 

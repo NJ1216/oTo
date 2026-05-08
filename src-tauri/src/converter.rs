@@ -257,38 +257,35 @@ fn resolve_output_path(
 fn build_codec_args(format: &str, settings: &Settings, info: &FileInfo) -> Vec<String> {
     match format {
         "mp3" => {
-            let bitrate: u32 = if settings.mp3_preset == "custom" {
-                settings.mp3_bitrate
-            } else {
-                settings.mp3_preset.parse().unwrap_or(192)
-            };
-            let mut args = vec![
-                "-c:a".into(), "libmp3lame".into(),
-                "-b:a".into(), format!("{}k", bitrate),
-            ];
+            let mut args = vec!["-c:a".into(), "libmp3lame".into()];
             if settings.mp3_preset == "custom" {
+                if settings.mp3_mode == "vbr" {
+                    args.extend(["-q:a".into(), settings.mp3_vbr_quality.to_string()]);
+                } else {
+                    args.extend(["-b:a".into(), format!("{}k", settings.mp3_bitrate)]);
+                }
                 if settings.mp3_sample_rate > 0 {
                     args.extend(["-ar".into(), settings.mp3_sample_rate.to_string()]);
                 }
                 match settings.mp3_channel_mode.as_str() {
                     "mono"   => args.extend(["-ac".into(), "1".into()]),
                     "stereo" => args.extend(["-ac".into(), "2".into()]),
-                    _ => {}
+                    _ => {} // "joint_stereo" / "auto" はソースに従う
                 }
+            } else {
+                let bitrate: u32 = settings.mp3_preset.parse().unwrap_or(192);
+                args.extend(["-b:a".into(), format!("{}k", bitrate)]);
             }
             args
         }
         "aac" => {
-            let bitrate: u32 = if settings.aac_preset == "custom" {
-                settings.m4a_bitrate
-            } else {
-                settings.aac_preset.parse().unwrap_or(128)
-            };
-            let mut args = vec![
-                "-c:a".into(), "aac".into(),
-                "-b:a".into(), format!("{}k", bitrate),
-            ];
+            let mut args = vec!["-c:a".into(), "aac".into()];
             if settings.aac_preset == "custom" {
+                if settings.aac_mode == "vbr" {
+                    args.extend(["-vbr".into(), settings.aac_vbr_quality.to_string()]);
+                } else {
+                    args.extend(["-b:a".into(), format!("{}k", settings.m4a_bitrate)]);
+                }
                 if settings.aac_sample_rate > 0 {
                     args.extend(["-ar".into(), settings.aac_sample_rate.to_string()]);
                 }
@@ -297,32 +294,40 @@ fn build_codec_args(format: &str, settings: &Settings, info: &FileInfo) -> Vec<S
                     2 => args.extend(["-ac".into(), "2".into()]),
                     _ => {}
                 }
+            } else {
+                let bitrate: u32 = settings.aac_preset.parse().unwrap_or(128);
+                args.extend(["-b:a".into(), format!("{}k", bitrate)]);
             }
             args
         }
         "ogg" => {
-            let quality = if settings.ogg_preset == "custom" {
-                settings.ogg_quality
+            let mut args = vec!["-c:a".into(), "libvorbis".into()];
+            if settings.ogg_preset == "custom" {
+                if settings.ogg_mode == "cbr" {
+                    args.extend(["-b:a".into(), format!("{}k", settings.ogg_cbr_bitrate)]);
+                } else {
+                    args.extend(["-q:a".into(), format!("{}", settings.ogg_quality)]);
+                }
             } else {
-                settings.ogg_preset
+                let quality = settings.ogg_preset
                     .trim_start_matches('q')
                     .parse::<f32>()
-                    .unwrap_or(4.0)
-            };
-            vec!["-c:a".into(), "libvorbis".into(), "-q:a".into(), format!("{}", quality)]
+                    .unwrap_or(4.0);
+                args.extend(["-q:a".into(), format!("{}", quality)]);
+            }
+            args
         }
         "opus" => {
-            let bitrate = if settings.opus_preset == "custom" {
-                settings.opus_bitrate
-            } else {
-                settings.opus_preset.parse().unwrap_or(128)
-            };
-            let mut args = vec![
-                "-c:a".into(), "libopus".into(),
-                "-b:a".into(), format!("{}k", bitrate),
-            ];
+            let mut args = vec!["-c:a".into(), "libopus".into()];
             if settings.opus_preset == "custom" {
+                if settings.opus_mode == "cbr" {
+                    args.extend(["-vbr".into(), "off".into()]);
+                }
+                args.extend(["-b:a".into(), format!("{}k", settings.opus_bitrate)]);
                 args.extend(["-compression_level".into(), settings.opus_complexity.to_string()]);
+            } else {
+                let bitrate: u32 = settings.opus_preset.parse().unwrap_or(128);
+                args.extend(["-b:a".into(), format!("{}k", bitrate)]);
             }
             args
         }
@@ -388,7 +393,8 @@ async fn convert_one(
     // WAVはコンテナ仕様上カバーアート非対応。カバーアートが存在する場合のみ画像ストリームをコピーする。
     // probe_file で attached_pic フラグを確認済みのため、動画ストリームを誤ってカバーアートとして
     // マップするバグ（MP4→MP3/M4A変換で数秒しか出力されない問題）を防ぐ。
-    if format != "wav" && info.has_cover_art {
+    // OGG/OPUS/AIFFはコンテナ仕様上カバーアート（video stream）非対応
+    if matches!(format, "mp3" | "aac" | "flac" | "alac") && info.has_cover_art {
         args.extend([
             "-map".into(),
             "0:v?".into(),

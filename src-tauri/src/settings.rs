@@ -44,6 +44,16 @@ fn default_opus_complexity() -> u32 { 5 }
 fn default_flac_preset() -> String { "5".into() }
 fn default_alac_bit_depth() -> u32 { 16 }
 
+fn default_mp3_mode() -> String     { "cbr".into() }
+fn default_mp3_bitrate() -> u32     { 192 }
+fn default_mp3_vbr_quality() -> u32 { 4 }
+fn default_aac_mode() -> String     { "cbr".into() }
+fn default_m4a_bitrate() -> u32     { 128 }
+fn default_aac_vbr_quality() -> u32 { 4 }
+fn default_ogg_mode() -> String     { "vbr".into() }
+fn default_ogg_cbr_bitrate() -> u32 { 192 }
+fn default_opus_mode() -> String    { "vbr".into() }
+
 fn calc_parallel_count(full_power: bool) -> usize {
     let cpu_count = std::thread::available_parallelism()
         .map(|n| n.get())
@@ -61,7 +71,12 @@ pub struct Settings {
     // MP3
     #[serde(default = "default_mp3_preset")]
     pub mp3_preset: String,
+    #[serde(default = "default_mp3_mode")]
+    pub mp3_mode: String,
+    #[serde(default = "default_mp3_bitrate")]
     pub mp3_bitrate: u32,
+    #[serde(default = "default_mp3_vbr_quality")]
+    pub mp3_vbr_quality: u32,
     #[serde(default)]
     pub mp3_sample_rate: u32,
     #[serde(default = "default_mp3_channel_mode")]
@@ -70,7 +85,12 @@ pub struct Settings {
     // AAC
     #[serde(default = "default_aac_preset")]
     pub aac_preset: String,
+    #[serde(default = "default_aac_mode")]
+    pub aac_mode: String,
+    #[serde(default = "default_m4a_bitrate")]
     pub m4a_bitrate: u32,
+    #[serde(default = "default_aac_vbr_quality")]
+    pub aac_vbr_quality: u32,
     #[serde(default)]
     pub aac_sample_rate: u32,
     #[serde(default)]
@@ -79,12 +99,18 @@ pub struct Settings {
     // OGG
     #[serde(default = "default_ogg_preset")]
     pub ogg_preset: String,
+    #[serde(default = "default_ogg_mode")]
+    pub ogg_mode: String,
     #[serde(default = "default_ogg_quality")]
     pub ogg_quality: f32,
+    #[serde(default = "default_ogg_cbr_bitrate")]
+    pub ogg_cbr_bitrate: u32,
 
     // OPUS
     #[serde(default = "default_opus_preset")]
     pub opus_preset: String,
+    #[serde(default = "default_opus_mode")]
+    pub opus_mode: String,
     #[serde(default = "default_opus_bitrate")]
     pub opus_bitrate: u32,
     #[serde(default = "default_opus_complexity")]
@@ -125,16 +151,23 @@ impl Default for Settings {
             source_file_action: SourceFileAction::Keep,
             name_conflict: NameConflict::AutoRename,
             mp3_preset: default_mp3_preset(),
-            mp3_bitrate: 192,
+            mp3_mode: default_mp3_mode(),
+            mp3_bitrate: default_mp3_bitrate(),
+            mp3_vbr_quality: default_mp3_vbr_quality(),
             mp3_sample_rate: 0,
             mp3_channel_mode: default_mp3_channel_mode(),
             aac_preset: default_aac_preset(),
-            m4a_bitrate: 128,
+            aac_mode: default_aac_mode(),
+            m4a_bitrate: default_m4a_bitrate(),
+            aac_vbr_quality: default_aac_vbr_quality(),
             aac_sample_rate: 0,
             aac_channels: 0,
             ogg_preset: default_ogg_preset(),
+            ogg_mode: default_ogg_mode(),
             ogg_quality: default_ogg_quality(),
+            ogg_cbr_bitrate: default_ogg_cbr_bitrate(),
             opus_preset: default_opus_preset(),
+            opus_mode: default_opus_mode(),
             opus_bitrate: default_opus_bitrate(),
             opus_complexity: default_opus_complexity(),
             flac_preset: default_flac_preset(),
