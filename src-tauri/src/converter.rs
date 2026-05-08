@@ -257,47 +257,90 @@ fn resolve_output_path(
 fn build_codec_args(format: &str, settings: &Settings, info: &FileInfo) -> Vec<String> {
     match format {
         "mp3" => {
+            let bitrate: u32 = if settings.mp3_preset == "custom" {
+                settings.mp3_bitrate
+            } else {
+                settings.mp3_preset.parse().unwrap_or(192)
+            };
             let mut args = vec![
-                "-c:a".into(),
-                "libmp3lame".into(),
-                "-b:a".into(),
-                format!("{}k", settings.mp3_bitrate),
+                "-c:a".into(), "libmp3lame".into(),
+                "-b:a".into(), format!("{}k", bitrate),
             ];
-            if settings.mp3_sample_rate > 0 {
-                args.extend(["-ar".into(), settings.mp3_sample_rate.to_string()]);
-            }
-            match settings.mp3_channel_mode.as_str() {
-                "mono" => args.extend(["-ac".into(), "1".into()]),
-                "stereo" => args.extend(["-ac".into(), "2".into()]),
-                _ => {}
+            if settings.mp3_preset == "custom" {
+                if settings.mp3_sample_rate > 0 {
+                    args.extend(["-ar".into(), settings.mp3_sample_rate.to_string()]);
+                }
+                match settings.mp3_channel_mode.as_str() {
+                    "mono"   => args.extend(["-ac".into(), "1".into()]),
+                    "stereo" => args.extend(["-ac".into(), "2".into()]),
+                    _ => {}
+                }
             }
             args
         }
-        "aac" => vec![
-            "-c:a".into(),
-            "aac".into(),
-            "-b:a".into(),
-            format!("{}k", settings.m4a_bitrate),
-        ],
-        "flac" => vec![
-            "-c:a".into(),
-            "flac".into(),
-            "-compression_level".into(),
-            settings.flac_compression.to_string(),
-        ],
-        "alac" => vec!["-c:a".into(), "alac".into()],
-        "ogg" => vec![
-            "-c:a".into(),
-            "libvorbis".into(),
-            "-q:a".into(),
-            "4".into(),
-        ],
-        "opus" => vec![
-            "-c:a".into(),
-            "libopus".into(),
-            "-b:a".into(),
-            "128k".into(),
-        ],
+        "aac" => {
+            let bitrate: u32 = if settings.aac_preset == "custom" {
+                settings.m4a_bitrate
+            } else {
+                settings.aac_preset.parse().unwrap_or(128)
+            };
+            let mut args = vec![
+                "-c:a".into(), "aac".into(),
+                "-b:a".into(), format!("{}k", bitrate),
+            ];
+            if settings.aac_preset == "custom" {
+                if settings.aac_sample_rate > 0 {
+                    args.extend(["-ar".into(), settings.aac_sample_rate.to_string()]);
+                }
+                match settings.aac_channels {
+                    1 => args.extend(["-ac".into(), "1".into()]),
+                    2 => args.extend(["-ac".into(), "2".into()]),
+                    _ => {}
+                }
+            }
+            args
+        }
+        "ogg" => {
+            let quality = if settings.ogg_preset == "custom" {
+                settings.ogg_quality
+            } else {
+                settings.ogg_preset
+                    .trim_start_matches('q')
+                    .parse::<f32>()
+                    .unwrap_or(4.0)
+            };
+            vec!["-c:a".into(), "libvorbis".into(), "-q:a".into(), format!("{}", quality)]
+        }
+        "opus" => {
+            let bitrate = if settings.opus_preset == "custom" {
+                settings.opus_bitrate
+            } else {
+                settings.opus_preset.parse().unwrap_or(128)
+            };
+            let mut args = vec![
+                "-c:a".into(), "libopus".into(),
+                "-b:a".into(), format!("{}k", bitrate),
+            ];
+            if settings.opus_preset == "custom" {
+                args.extend(["-compression_level".into(), settings.opus_complexity.to_string()]);
+            }
+            args
+        }
+        "flac" => {
+            let level: u8 = if settings.flac_preset == "custom" {
+                settings.flac_compression
+            } else {
+                settings.flac_preset.parse().unwrap_or(5)
+            };
+            vec!["-c:a".into(), "flac".into(), "-compression_level".into(), level.to_string()]
+        }
+        "alac" => {
+            let mut args = vec!["-c:a".into(), "alac".into()];
+            if settings.alac_preset == "custom" && settings.alac_bit_depth == 24 {
+                args.extend(["-sample_fmt".into(), "s32p".into()]);
+            }
+            args
+        }
         "wav" => {
             let pcm_codec = match info.bits_per_sample {
                 24 => "pcm_s24le",

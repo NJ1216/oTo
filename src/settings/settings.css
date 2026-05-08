@@ -184,39 +184,41 @@ input[type="checkbox"] {
   accent-color: rgba(99, 102, 241, 0.9);
 }
 
-/* Collapsible codec detail */
-details {
+/* Custom detail panel (inline expand below preset select) */
+.custom-detail {
+  display: none;
+  grid-column: 1 / -1;
+  background: rgba(255, 255, 255, 0.04);
   border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: 5px;
-  overflow: hidden;
+  margin-bottom: 2px;
 }
 
-details summary {
-  padding: 7px 10px;
-  font-size: 12px;
-  color: rgba(255, 255, 255, 0.65);
-  cursor: pointer;
-  user-select: none;
-  list-style: none;
-  display: flex;
+.custom-detail.open {
+  display: block;
+}
+
+.custom-inner {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px 12px;
   align-items: center;
-  gap: 6px;
+  padding: 8px 10px;
 }
 
-details summary::before {
-  content: '▶';
-  font-size: 9px;
-  transition: transform 0.15s;
-  color: rgba(255, 255, 255, 0.4);
+.custom-inner label {
+  color: rgba(255, 255, 255, 0.65);
+  font-size: 12px;
 }
 
-details[open] summary::before {
-  transform: rotate(90deg);
-}
-
-.detail-grid {
-  padding: 8px 10px 10px;
-  border-top: 1px solid rgba(255, 255, 255, 0.08);
+.custom-inner input[type="number"] {
+  width: 100%;
+  background: rgba(255, 255, 255, 0.07);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 4px;
+  color: rgba(255, 255, 255, 0.85);
+  font-size: 12px;
+  padding: 4px 6px;
 }
 
 /* Full-power toggle */

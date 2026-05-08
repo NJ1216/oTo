@@ -48,63 +48,154 @@
     <section class="section">
       <h2 data-i18n="settings.quality.title">変換品質</h2>
       <div class="quality-grid">
+
+        <!-- MP3 -->
         <label data-i18n="settings.quality.mp3.label">MP3 ビットレート</label>
         <div class="select-wrap">
-          <select id="mp3Bitrate">
+          <select id="mp3Preset">
             <option value="128" data-i18n="settings.quality.mp3.128">128 kbps</option>
             <option value="192" data-i18n="settings.quality.mp3.192">192 kbps（デフォルト）</option>
             <option value="256" data-i18n="settings.quality.mp3.256">256 kbps</option>
             <option value="320" data-i18n="settings.quality.mp3.320">320 kbps</option>
+            <option value="custom" data-i18n="settings.quality.custom">カスタム…</option>
           </select>
         </div>
+        <div class="custom-detail" id="mp3Custom">
+          <div class="custom-inner">
+            <label data-i18n="settings.custom.bitrate">ビットレート (kbps)</label>
+            <input type="number" id="mp3Bitrate" min="32" max="320" value="192" />
+            <label data-i18n="settings.custom.sampleRate">サンプルレート</label>
+            <div class="select-wrap">
+              <select id="mp3SampleRate">
+                <option value="0" data-i18n="settings.custom.auto">自動</option>
+                <option value="44100">44.1 kHz</option>
+                <option value="48000">48 kHz</option>
+                <option value="88200">88.2 kHz</option>
+                <option value="96000">96 kHz</option>
+              </select>
+            </div>
+            <label data-i18n="settings.custom.channel">チャンネル</label>
+            <div class="select-wrap">
+              <select id="mp3ChannelMode">
+                <option value="joint_stereo" data-i18n="settings.custom.jointStereo">Joint Stereo</option>
+                <option value="stereo" data-i18n="settings.custom.stereo">Stereo</option>
+                <option value="mono" data-i18n="settings.custom.mono">Mono</option>
+              </select>
+            </div>
+          </div>
+        </div>
 
+        <!-- AAC -->
         <label data-i18n="settings.quality.aac.label">AAC ビットレート</label>
         <div class="select-wrap">
-          <select id="m4aBitrate">
-            <option value="96" data-i18n="settings.quality.aac.96">96 kbps</option>
+          <select id="aacPreset">
+            <option value="96"  data-i18n="settings.quality.aac.96">96 kbps</option>
             <option value="128" data-i18n="settings.quality.aac.128">128 kbps（デフォルト）</option>
             <option value="192" data-i18n="settings.quality.aac.192">192 kbps</option>
             <option value="256" data-i18n="settings.quality.aac.256">256 kbps</option>
+            <option value="custom" data-i18n="settings.quality.custom">カスタム…</option>
           </select>
         </div>
+        <div class="custom-detail" id="aacCustom">
+          <div class="custom-inner">
+            <label data-i18n="settings.custom.bitrate">ビットレート (kbps)</label>
+            <input type="number" id="m4aBitrate" min="32" max="320" value="128" />
+            <label data-i18n="settings.custom.sampleRate">サンプルレート</label>
+            <div class="select-wrap">
+              <select id="aacSampleRate">
+                <option value="0"     data-i18n="settings.custom.auto">自動</option>
+                <option value="44100">44.1 kHz</option>
+                <option value="48000">48 kHz</option>
+              </select>
+            </div>
+            <label data-i18n="settings.custom.channel">チャンネル</label>
+            <div class="select-wrap">
+              <select id="aacChannels">
+                <option value="0" data-i18n="settings.custom.auto">自動</option>
+                <option value="2" data-i18n="settings.custom.stereo">Stereo</option>
+                <option value="1" data-i18n="settings.custom.mono">Mono</option>
+              </select>
+            </div>
+          </div>
+        </div>
 
+        <!-- OGG -->
+        <label data-i18n="settings.quality.ogg.label">OGG クオリティ</label>
+        <div class="select-wrap">
+          <select id="oggPreset">
+            <option value="q2" data-i18n="settings.quality.ogg.q2">Q2（低）</option>
+            <option value="q4" data-i18n="settings.quality.ogg.q4">Q4（デフォルト）</option>
+            <option value="q6" data-i18n="settings.quality.ogg.q6">Q6（高）</option>
+            <option value="q8" data-i18n="settings.quality.ogg.q8">Q8（最高）</option>
+            <option value="custom" data-i18n="settings.quality.custom">カスタム…</option>
+          </select>
+        </div>
+        <div class="custom-detail" id="oggCustom">
+          <div class="custom-inner">
+            <label data-i18n="settings.custom.oggQuality">クオリティ (0–10)</label>
+            <input type="number" id="oggQuality" min="0" max="10" step="0.1" value="4" />
+          </div>
+        </div>
+
+        <!-- OPUS -->
+        <label data-i18n="settings.quality.opus.label">OPUS ビットレート</label>
+        <div class="select-wrap">
+          <select id="opusPreset">
+            <option value="64"  data-i18n="settings.quality.opus.64">64 kbps</option>
+            <option value="96"  data-i18n="settings.quality.opus.96">96 kbps</option>
+            <option value="128" data-i18n="settings.quality.opus.128">128 kbps（デフォルト）</option>
+            <option value="192" data-i18n="settings.quality.opus.192">192 kbps</option>
+            <option value="custom" data-i18n="settings.quality.custom">カスタム…</option>
+          </select>
+        </div>
+        <div class="custom-detail" id="opusCustom">
+          <div class="custom-inner">
+            <label data-i18n="settings.custom.bitrate">ビットレート (kbps)</label>
+            <input type="number" id="opusBitrate" min="6" max="510" value="128" />
+            <label data-i18n="settings.custom.opusComplexity">複雑度 (0–10)</label>
+            <input type="number" id="opusComplexity" min="0" max="10" value="5" />
+          </div>
+        </div>
+
+        <!-- FLAC -->
         <label data-i18n="settings.quality.flac.label">FLAC 圧縮レベル</label>
         <div class="select-wrap">
-          <select id="flacCompression">
+          <select id="flacPreset">
             <option value="0" data-i18n="settings.quality.flac.0">0（最速）</option>
             <option value="3" data-i18n="settings.quality.flac.3">3</option>
             <option value="5" data-i18n="settings.quality.flac.5">5（デフォルト）</option>
             <option value="8" data-i18n="settings.quality.flac.8">8（最高圧縮）</option>
+            <option value="custom" data-i18n="settings.quality.custom">カスタム…</option>
           </select>
         </div>
-      </div>
-    </section>
-
-    <!-- MP3 詳細設定 -->
-    <section class="section">
-      <details id="mp3-detail">
-        <summary data-i18n="settings.mp3detail.title">MP3 詳細設定</summary>
-        <div class="quality-grid detail-grid">
-          <label data-i18n="settings.mp3detail.sampleRate">サンプルレート</label>
-          <div class="select-wrap">
-            <select id="mp3SampleRate">
-              <option value="0" data-i18n="settings.mp3detail.sampleRateAuto">自動</option>
-              <option value="44100">44.1 kHz</option>
-              <option value="48000">48 kHz</option>
-              <option value="88200">88.2 kHz</option>
-              <option value="96000">96 kHz</option>
-            </select>
-          </div>
-          <label data-i18n="settings.mp3detail.channelMode">チャンネル</label>
-          <div class="select-wrap">
-            <select id="mp3ChannelMode">
-              <option value="joint_stereo" data-i18n="settings.mp3detail.jointStereo">Joint Stereo（デフォルト）</option>
-              <option value="stereo" data-i18n="settings.mp3detail.stereo">Stereo</option>
-              <option value="mono" data-i18n="settings.mp3detail.mono">Mono</option>
-            </select>
+        <div class="custom-detail" id="flacCustom">
+          <div class="custom-inner">
+            <label data-i18n="settings.custom.flacLevel">圧縮レベル (0–8)</label>
+            <input type="number" id="flacCompression" min="0" max="8" value="5" />
           </div>
         </div>
-      </details>
+
+        <!-- ALAC -->
+        <label data-i18n="settings.quality.alac.label">ALAC</label>
+        <div class="select-wrap">
+          <select id="alacPreset">
+            <option value="" data-i18n="settings.quality.alac.default">標準（ロスレス）</option>
+            <option value="custom" data-i18n="settings.quality.custom">カスタム…</option>
+          </select>
+        </div>
+        <div class="custom-detail" id="alacCustom">
+          <div class="custom-inner">
+            <label data-i18n="settings.custom.bitDepth">ビット深度</label>
+            <div class="select-wrap">
+              <select id="alacBitDepth">
+                <option value="16">16 bit</option>
+                <option value="24">24 bit</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+      </div>
     </section>
 
     <!-- 並列変換 -->

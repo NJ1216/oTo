@@ -42,6 +42,7 @@ export default {
     },
     quality: {
       title: '変換品質',
+      custom: 'カスタム…',
       mp3: {
         label: 'MP3 ビットレート',
         128: '128 kbps',
@@ -56,6 +57,20 @@ export default {
         192: '192 kbps',
         256: '256 kbps',
       },
+      ogg: {
+        label: 'OGG クオリティ',
+        q2: 'Q2（低）',
+        q4: 'Q4（デフォルト）',
+        q6: 'Q6（高）',
+        q8: 'Q8（最高）',
+      },
+      opus: {
+        label: 'OPUS ビットレート',
+        64: '64 kbps',
+        96: '96 kbps',
+        128: '128 kbps（デフォルト）',
+        192: '192 kbps',
+      },
       flac: {
         label: 'FLAC 圧縮レベル',
         0: '0（最速）',
@@ -63,6 +78,23 @@ export default {
         5: '5（デフォルト）',
         8: '8（最高圧縮）',
       },
+      alac: {
+        label: 'ALAC',
+        default: '標準（ロスレス）',
+      },
+    },
+    custom: {
+      bitrate: 'ビットレート (kbps)',
+      sampleRate: 'サンプルレート',
+      auto: '自動',
+      channel: 'チャンネル',
+      jointStereo: 'Joint Stereo',
+      stereo: 'Stereo',
+      mono: 'Mono',
+      oggQuality: 'クオリティ (0–10)',
+      opusComplexity: '複雑度 (0–10)',
+      flacLevel: '圧縮レベル (0–8)',
+      bitDepth: 'ビット深度',
     },
     parallel: {
       title: '並列変換',
@@ -74,15 +106,6 @@ export default {
     formats: {
       title: '表示フォーマット',
       hint: 'メインウィンドウに表示する変換形式（最低1つ必要）',
-    },
-    mp3detail: {
-      title: 'MP3 詳細設定',
-      sampleRate: 'サンプルレート',
-      sampleRateAuto: '自動',
-      channelMode: 'チャンネル',
-      jointStereo: 'Joint Stereo（デフォルト）',
-      stereo: 'Stereo',
-      mono: 'Mono',
     },
     misc: {
       title: 'その他',

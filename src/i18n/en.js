@@ -42,6 +42,7 @@ export default {
     },
     quality: {
       title: 'Quality',
+      custom: 'Custom…',
       mp3: {
         label: 'MP3 Bitrate',
         128: '128 kbps',
@@ -56,6 +57,20 @@ export default {
         192: '192 kbps',
         256: '256 kbps',
       },
+      ogg: {
+        label: 'OGG Quality',
+        q2: 'Q2 (low)',
+        q4: 'Q4 (default)',
+        q6: 'Q6 (high)',
+        q8: 'Q8 (best)',
+      },
+      opus: {
+        label: 'OPUS Bitrate',
+        64: '64 kbps',
+        96: '96 kbps',
+        128: '128 kbps (default)',
+        192: '192 kbps',
+      },
       flac: {
         label: 'FLAC Compression',
         0: '0 (fastest)',
@@ -63,6 +78,23 @@ export default {
         5: '5 (default)',
         8: '8 (best compression)',
       },
+      alac: {
+        label: 'ALAC',
+        default: 'Standard (lossless)',
+      },
+    },
+    custom: {
+      bitrate: 'Bitrate (kbps)',
+      sampleRate: 'Sample Rate',
+      auto: 'Auto',
+      channel: 'Channel',
+      jointStereo: 'Joint Stereo',
+      stereo: 'Stereo',
+      mono: 'Mono',
+      oggQuality: 'Quality (0–10)',
+      opusComplexity: 'Complexity (0–10)',
+      flacLevel: 'Compression Level (0–8)',
+      bitDepth: 'Bit Depth',
     },
     parallel: {
       title: 'Parallel Conversion',
@@ -74,15 +106,6 @@ export default {
     formats: {
       title: 'Visible Formats',
       hint: 'Choose which formats appear in the main window (at least one required)',
-    },
-    mp3detail: {
-      title: 'MP3 Advanced',
-      sampleRate: 'Sample Rate',
-      sampleRateAuto: 'Auto',
-      channelMode: 'Channel',
-      jointStereo: 'Joint Stereo (default)',
-      stereo: 'Stereo',
-      mono: 'Mono',
     },
     misc: {
       title: 'Other',

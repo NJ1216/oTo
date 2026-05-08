@@ -32,20 +32,35 @@ function populateForm(s) {
   const conflictRadio = document.querySelector(`input[name="nameConflict"][value="${conflictVal}"]`);
   if (conflictRadio) conflictRadio.checked = true;
 
-  // Quality
-  document.getElementById('mp3Bitrate').value = String(s.mp3Bitrate);
-  document.getElementById('m4aBitrate').value = String(s.m4aBitrate);
-  document.getElementById('flacCompression').value = String(s.flacCompression);
-
-  // MP3 詳細設定
+  // Quality presets
+  setPreset('mp3Preset', s.mp3Preset || '192');
+  document.getElementById('mp3Bitrate').value = String(s.mp3Bitrate || 192);
   document.getElementById('mp3SampleRate').value = String(s.mp3SampleRate ?? 0);
   document.getElementById('mp3ChannelMode').value = s.mp3ChannelMode || 'joint_stereo';
+
+  setPreset('aacPreset', s.aacPreset || '128');
+  document.getElementById('m4aBitrate').value = String(s.m4aBitrate || 128);
+  document.getElementById('aacSampleRate').value = String(s.aacSampleRate ?? 0);
+  document.getElementById('aacChannels').value = String(s.aacChannels ?? 0);
+
+  setPreset('oggPreset', s.oggPreset || 'q4');
+  document.getElementById('oggQuality').value = String(s.oggQuality ?? 4);
+
+  setPreset('opusPreset', s.opusPreset || '128');
+  document.getElementById('opusBitrate').value = String(s.opusBitrate || 128);
+  document.getElementById('opusComplexity').value = String(s.opusComplexity ?? 5);
+
+  setPreset('flacPreset', s.flacPreset || '5');
+  document.getElementById('flacCompression').value = String(s.flacCompression ?? 5);
+
+  setPreset('alacPreset', s.alacPreset || '');
+  document.getElementById('alacBitDepth').value = String(s.alacBitDepth || 16);
 
   // Full power toggle
   document.getElementById('fullPower').checked = !!s.fullPower;
 
   // Enabled formats
-  const enabled = s.enabledFormats || ['mp3', 'm4a', 'flac'];
+  const enabled = s.enabledFormats || ['mp3', 'aac', 'flac'];
   document.querySelectorAll('.fmt-check').forEach((cb) => {
     cb.checked = enabled.includes(cb.dataset.fmt);
   });
@@ -56,6 +71,26 @@ function populateForm(s) {
   // Language
   document.getElementById('language').value = s.language || '';
 }
+
+function setPreset(selectId, value) {
+  const el = document.getElementById(selectId);
+  if (!el) return;
+  el.value = value;
+  toggleCustomDetail(selectId, value === 'custom');
+}
+
+function toggleCustomDetail(selectId, show) {
+  const detailId = selectId.replace('Preset', 'Custom');
+  const detail = document.getElementById(detailId);
+  if (detail) detail.classList.toggle('open', show);
+}
+
+// Wire up all preset selects to show/hide custom panels
+['mp3Preset', 'aacPreset', 'oggPreset', 'opusPreset', 'flacPreset', 'alacPreset'].forEach((id) => {
+  document.getElementById(id)?.addEventListener('change', (e) => {
+    toggleCustomDetail(id, e.target.value === 'custom');
+  });
+});
 
 function snakeCase(val) {
   return val.replace(/([A-Z])/g, (m) => '_' + m.toLowerCase());
@@ -93,11 +128,23 @@ document.getElementById('save-btn').addEventListener('click', async () => {
     outputDest: outputDest || 'source_folder',
     sourceFileAction: sourceFileAction || 'keep',
     nameConflict: nameConflict || 'auto_rename',
-    mp3Bitrate: parseInt(document.getElementById('mp3Bitrate').value, 10),
+    mp3Preset: document.getElementById('mp3Preset').value,
+    mp3Bitrate: parseInt(document.getElementById('mp3Bitrate').value, 10) || 192,
     mp3SampleRate: parseInt(document.getElementById('mp3SampleRate').value, 10),
     mp3ChannelMode: document.getElementById('mp3ChannelMode').value,
-    m4aBitrate: parseInt(document.getElementById('m4aBitrate').value, 10),
+    aacPreset: document.getElementById('aacPreset').value,
+    m4aBitrate: parseInt(document.getElementById('m4aBitrate').value, 10) || 128,
+    aacSampleRate: parseInt(document.getElementById('aacSampleRate').value, 10),
+    aacChannels: parseInt(document.getElementById('aacChannels').value, 10),
+    oggPreset: document.getElementById('oggPreset').value,
+    oggQuality: parseFloat(document.getElementById('oggQuality').value) || 4,
+    opusPreset: document.getElementById('opusPreset').value,
+    opusBitrate: parseInt(document.getElementById('opusBitrate').value, 10) || 128,
+    opusComplexity: parseInt(document.getElementById('opusComplexity').value, 10),
+    flacPreset: document.getElementById('flacPreset').value,
     flacCompression: parseInt(document.getElementById('flacCompression').value, 10),
+    alacPreset: document.getElementById('alacPreset').value,
+    alacBitDepth: parseInt(document.getElementById('alacBitDepth').value, 10) || 16,
     fullPower: document.getElementById('fullPower').checked,
     openInFinder: document.getElementById('openInFinder').checked,
     customOutputPath: customPath,
