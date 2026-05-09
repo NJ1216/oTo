@@ -256,6 +256,8 @@ pub fn run() {
             open_url,
         ])
         .setup(|app| {
+            #[cfg(not(target_os = "macos"))]
+            let _ = &app;
             #[cfg(target_os = "macos")]
             {
                 use tauri::menu::{MenuBuilder, PredefinedMenuItem, SubmenuBuilder, MenuItem};

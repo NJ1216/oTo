@@ -4,11 +4,12 @@ name: Build & Release
 # トリガー設定
 # ─────────────────────────────────────────────
 on:
-  push:
-    branches: [main]        # mainへのpush → ビルド + Artifact保存
-    tags:
-      - 'v*'                # v1.0.0 などのタグpush → Draft Releaseも作成
-  workflow_dispatch:        # GitHub画面から手動実行も可能
+  # push/tagトリガーは一時停止中。ローカルWindowsビルド確認後に再有効化予定。
+  # push:
+  #   branches: [main]
+  #   tags:
+  #     - 'v*'
+  workflow_dispatch:        # 手動実行のみ有効
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true   # Node.js 20 非推奨警告を解消
