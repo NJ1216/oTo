@@ -469,20 +469,38 @@ async fn convert_one(
 
     args.extend(build_codec_args(format, settings, info));
 
-    // Progress to stdout
-    args.push("-progress".into());
-    args.push("pipe:1".into());
+    // Progress: Unix → stdout pipe; Windows → 一時ファイル経由
+    // CREATE_NO_WINDOW 環境では pipe:1 が正しく動作しないため Windows のみ別方式を使用
+    #[cfg(not(windows))]
+    {
+        args.push("-progress".into());
+        args.push("pipe:1".into());
+    }
+    #[cfg(windows)]
+    let progress_path = {
+        let mut p = std::env::temp_dir();
+        p.push(format!("oto_p{}.txt", std::process::id()));
+        args.push("-progress".into());
+        args.push(p.to_string_lossy().into_owned());
+        p
+    };
     args.push("-nostats".into());
 
     args.push(output.to_string_lossy().into_owned());
 
     let mut cmd = tokio::process::Command::new(&ffmpeg);
+    #[cfg(not(windows))]
     cmd.args(&args)
        .stdout(Stdio::piped())
        .stderr(Stdio::piped());
-
     #[cfg(windows)]
-    cmd.creation_flags(0x08000000); // CREATE_NO_WINDOW
+    {
+        cmd.args(&args)
+           .stdin(Stdio::null())
+           .stdout(Stdio::null())   // プログレスは一時ファイルへ。stdout は不使用
+           .stderr(Stdio::piped())
+           .creation_flags(0x08000000); // CREATE_NO_WINDOW
+    }
 
     #[cfg(unix)]
     unsafe {
@@ -512,6 +530,7 @@ async fn convert_one(
         })
     });
 
+    #[cfg(not(windows))]
     if let Some(stdout) = child.stdout.take() {
         let mut lines = BufReader::new(stdout).lines();
         while let Ok(Some(line)) = lines.next_line().await {
@@ -528,6 +547,40 @@ async fn convert_one(
         if duration_secs > 0.0 {
             on_progress(1.0);
         }
+    }
+
+    // Windows: 一時ファイルを 200ms 間隔でポーリングしてプログレスを更新
+    // ffmpeg が "progress=end" を書くか stderr タスクが終了したらループを抜ける
+    #[cfg(windows)]
+    {
+        let mut prev_us = 0u64;
+        loop {
+            tokio::time::sleep(tokio::time::Duration::from_millis(200)).await;
+            if let Ok(content) = tokio::fs::read_to_string(&progress_path).await {
+                let mut last_us = 0u64;
+                for line in content.lines() {
+                    if let Some(val) = line.strip_prefix("out_time_us=") {
+                        last_us = val.trim().parse().unwrap_or(0);
+                    }
+                }
+                if last_us > prev_us && duration_secs > 0.0 {
+                    prev_us = last_us;
+                    let ratio = (last_us as f64 / 1_000_000.0) / duration_secs;
+                    on_progress(ratio.min(1.0));
+                }
+                if content.lines().any(|l| l.trim() == "progress=end") {
+                    break;
+                }
+            }
+            // ffmpeg が異常終了した場合も確実に抜けられるよう stderr タスク終了を監視
+            if stderr_task.as_ref().map(|t| t.is_finished()).unwrap_or(false) {
+                break;
+            }
+        }
+        if duration_secs > 0.0 {
+            on_progress(1.0);
+        }
+        let _ = tokio::fs::remove_file(&progress_path).await;
     }
 
     let status = child.wait().await?;
