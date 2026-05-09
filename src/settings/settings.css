@@ -98,16 +98,40 @@ h1 {
   color: rgba(255, 255, 255, 0.7);
 }
 
+.select-wrap {
+  position: relative;
+}
+
+/* カスタム矢印（appearance: none で消えるため代替表示） */
+.select-wrap::after {
+  content: '▾';
+  position: absolute;
+  right: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: rgba(255, 255, 255, 0.45);
+  pointer-events: none;
+  font-size: 11px;
+}
+
 .select-wrap select {
   width: 100%;
-  background: rgba(255, 255, 255, 0.07);
+  /* 半透明背景はWindowsで白背景に溶け込むため固定ダーク色に変更 */
+  background: #262637;
   border: 1px solid rgba(255, 255, 255, 0.14);
   border-radius: 4px;
   color: rgba(255, 255, 255, 0.85);
   font-size: 12px;
-  padding: 4px 6px;
+  padding: 4px 24px 4px 6px;
   cursor: pointer;
   appearance: none;
+  -webkit-appearance: none;
+}
+
+/* Windows WebView2でドロップダウンが白背景になるのを防ぐ */
+.select-wrap select option {
+  background: #262637;
+  color: rgba(255, 255, 255, 0.85);
 }
 
 .row {
@@ -123,7 +147,7 @@ h1 {
 
 .row input[type="number"] {
   width: 64px;
-  background: rgba(255, 255, 255, 0.07);
+  background: #262637;
   border: 1px solid rgba(255, 255, 255, 0.14);
   border-radius: 4px;
   color: rgba(255, 255, 255, 0.85);
@@ -239,7 +263,7 @@ input[type="checkbox"] {
 
 .custom-inner input[type="number"] {
   width: 100%;
-  background: rgba(255, 255, 255, 0.07);
+  background: #262637;
   border: 1px solid rgba(255, 255, 255, 0.14);
   border-radius: 4px;
   color: rgba(255, 255, 255, 0.85);

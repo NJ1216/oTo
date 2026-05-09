@@ -124,19 +124,17 @@ fn common_ancestor(paths: &[PathBuf]) -> Option<PathBuf> {
 
 async fn probe_file(path: &Path) -> FileInfo {
     let ffprobe = ffprobe_path();
-    let output = match tokio::process::Command::new(&ffprobe)
-        .args([
-            "-v",
-            "quiet",
-            "-print_format",
-            "json",
-            "-show_format",
-            "-show_streams",
-            path.to_str().unwrap_or(""),
-        ])
-        .output()
-        .await
-    {
+    let mut probe_cmd = tokio::process::Command::new(&ffprobe);
+    probe_cmd.args([
+        "-v", "quiet",
+        "-print_format", "json",
+        "-show_format",
+        "-show_streams",
+        path.to_str().unwrap_or(""),
+    ]);
+    #[cfg(windows)]
+    probe_cmd.creation_flags(0x08000000); // CREATE_NO_WINDOW
+    let output = match probe_cmd.output().await {
         Ok(o) => Some(o),
         Err(e) => {
             eprintln!("ffprobe spawn failed for {}: {e}", path.display());
@@ -482,6 +480,9 @@ async fn convert_one(
     cmd.args(&args)
        .stdout(Stdio::piped())
        .stderr(Stdio::piped());
+
+    #[cfg(windows)]
+    cmd.creation_flags(0x08000000); // CREATE_NO_WINDOW
 
     #[cfg(unix)]
     unsafe {
