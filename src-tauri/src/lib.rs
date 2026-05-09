@@ -68,7 +68,7 @@ async fn cancel_job(
             for &pid in pids.iter() {
                 unsafe {
                     let handle = OpenProcess(PROCESS_TERMINATE, 0, pid as u32);
-                    if handle != 0 {
+                    if !handle.is_null() {
                         TerminateProcess(handle, 1);
                         CloseHandle(handle);
                     }
@@ -125,7 +125,7 @@ async fn suspend_resume_windows_processes(
     pids: &Arc<Mutex<Vec<i32>>>,
     suspend: bool,
 ) {
-    use windows_sys::Win32::Foundation::CloseHandle;
+    use windows_sys::Win32::Foundation::{CloseHandle, INVALID_HANDLE_VALUE};
     use windows_sys::Win32::System::Diagnostics::ToolHelp::{
         CreateToolhelp32Snapshot, Thread32First, Thread32Next, THREADENTRY32, TH32CS_SNAPTHREAD,
     };
@@ -135,7 +135,7 @@ async fn suspend_resume_windows_processes(
     for &pid in pids_guard.iter() {
         unsafe {
             let snapshot = CreateToolhelp32Snapshot(TH32CS_SNAPTHREAD, 0);
-            if snapshot == usize::MAX as _ {
+            if snapshot == INVALID_HANDLE_VALUE {
                 continue;
             }
             let mut entry: THREADENTRY32 = std::mem::zeroed();
@@ -143,8 +143,8 @@ async fn suspend_resume_windows_processes(
             if Thread32First(snapshot, &mut entry) != 0 {
                 loop {
                     if entry.th32OwnerProcessID == pid as u32 {
-                        let thread = OpenThread(THREAD_SUSPEND_RESUME, 0, entry.dwThreadId);
-                        if thread != 0 {
+                        let thread = OpenThread(THREAD_SUSPEND_RESUME, 0, entry.th32ThreadID);
+                        if !thread.is_null() {
                             if suspend { SuspendThread(thread); } else { ResumeThread(thread); }
                             CloseHandle(thread);
                         }
