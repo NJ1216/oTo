@@ -217,7 +217,7 @@ async fn pick_folder(app: AppHandle) -> Result<Option<String>, String> {
 
 #[tauri::command]
 fn get_app_version() -> String {
-    format!("2026.5.5 (build {})", env!("GIT_HASH"))
+    format!("{} (build {})", env!("CARGO_PKG_VERSION"), env!("GIT_HASH"))
 }
 
 // --- App entry ---

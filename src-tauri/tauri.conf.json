@@ -1,8 +1,8 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "oTo",
-  "version": "2026.5.5",
-  "identifier": "com.akito.oto",
+  "version": "2026.5.9",
+  "identifier": "com.NJ1216.oto",
   "build": {
     "frontendDist": "../src"
   },
@@ -20,7 +20,7 @@
       }
     ],
     "security": {
-      "csp": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src ipc: https://ipc.localhost"
+      "csp": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src ipc: https://ipc.localhost 'self'"
     }
   },
   "bundle": {

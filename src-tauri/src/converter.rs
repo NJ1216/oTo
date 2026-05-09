@@ -65,7 +65,7 @@ struct FileInfo {
     duration_secs: f64,
     tags: HashMap<String, String>,
     bits_per_sample: u32,
-    has_cover_art: bool,
+    cover_art_stream_idx: Option<usize>, // MJPEG/PNG attached_pic のストリームインデックス
     has_media: bool,
 }
 
@@ -147,7 +147,7 @@ async fn probe_file(path: &Path) -> FileInfo {
     let mut duration = 0.0f64;
     let mut tags = HashMap::new();
     let mut bits_per_sample = 16u32;
-    let mut has_cover_art = false;
+    let mut cover_art_stream_idx: Option<usize> = None;
     let mut has_media = false;
 
     if let Some(out) = output {
@@ -163,7 +163,7 @@ async fn probe_file(path: &Path) -> FileInfo {
                 }
             }
             if let Some(streams) = json["streams"].as_array() {
-                for stream in streams {
+                for (stream_idx, stream) in streams.iter().enumerate() {
                     match stream["codec_type"].as_str().unwrap_or("") {
                         "audio" => {
                             has_media = true;
@@ -185,9 +185,15 @@ async fn probe_file(path: &Path) -> FileInfo {
                             }
                         }
                         "video" => {
-                            // disposition.attached_pic == 1 はカバーアート（埋め込み画像）
-                            if stream["disposition"]["attached_pic"].as_i64().unwrap_or(0) == 1 {
-                                has_cover_art = true;
+                            // MJPEG/PNGのattached_picのみカバーアートとして扱う
+                            // H264などのattached_picはMP3/FLACコンテナが非対応でエラーになるため除外
+                            if stream["disposition"]["attached_pic"].as_i64().unwrap_or(0) == 1
+                                && cover_art_stream_idx.is_none()
+                            {
+                                let codec = stream["codec_name"].as_str().unwrap_or("");
+                                if matches!(codec, "mjpeg" | "png") {
+                                    cover_art_stream_idx = Some(stream_idx);
+                                }
                             }
                         }
                         _ => {}
@@ -201,7 +207,7 @@ async fn probe_file(path: &Path) -> FileInfo {
         duration_secs: duration,
         tags,
         bits_per_sample,
-        has_cover_art,
+        cover_art_stream_idx,
         has_media,
     }
 }
@@ -427,7 +433,10 @@ async fn convert_one(
     let mut output_guard = OutputGuard { path: output.to_path_buf(), keep: false };
 
     let ffmpeg = ffmpeg_path();
+    let cpu_count = std::thread::available_parallelism().map(|n| n.get()).unwrap_or(4);
+    let threads_per_job = (cpu_count / settings.parallel_count.max(1)).max(1);
     let mut args: Vec<String> = vec![
+        "-threads".into(), threads_per_job.to_string(),
         "-y".into(),
         "-i".into(),
         input.to_string_lossy().into_owned(),
@@ -438,19 +447,20 @@ async fn convert_one(
     ];
 
     // カバーアート（埋め込み画像）の引き継ぎ
-    // WAVはコンテナ仕様上カバーアート非対応。カバーアートが存在する場合のみ画像ストリームをコピーする。
-    // probe_file で attached_pic フラグを確認済みのため、動画ストリームを誤ってカバーアートとして
-    // マップするバグ（MP4→MP3/M4A変換で数秒しか出力されない問題）を防ぐ。
-    // OGG/OPUS/AIFFはコンテナ仕様上カバーアート（video stream）非対応
-    if matches!(format, "mp3" | "aac" | "flac" | "alac") && info.has_cover_art {
-        args.extend([
-            "-map".into(),
-            "0:v?".into(),
-            "-c:v".into(),
-            "copy".into(),
-            "-disposition:v:0".into(),
-            "attached_pic".into(),
-        ]);
+    // WAV/OGG/OPUS/AIFFはコンテナ仕様上カバーアート非対応。
+    // 特定ストリームインデックスを使うことで、H264など非対応コーデックのattached_picを
+    // 誤ってマップするバグ（m4vのH264サムネイルでMP3変換失敗）を防ぐ。
+    if matches!(format, "mp3" | "aac" | "flac" | "alac") {
+        if let Some(idx) = info.cover_art_stream_idx {
+            args.extend([
+                "-map".into(),
+                format!("0:{}", idx),
+                "-c:v".into(),
+                "copy".into(),
+                "-disposition:v:0".into(),
+                "attached_pic".into(),
+            ]);
+        }
     }
 
     // Explicit tag copy (source tags take priority)
@@ -597,62 +607,6 @@ pub async fn run_conversion(
         }
     }
 
-    // Probe all size-valid files in parallel (order preserved via indexed join)
-    let probe_handles: Vec<_> = file_paths
-        .iter()
-        .map(|p| {
-            let path = p.clone();
-            tokio::spawn(async move { probe_file(&path).await })
-        })
-        .collect();
-
-    let mut raw_infos: Vec<FileInfo> = Vec::with_capacity(file_paths.len());
-    for h in probe_handles {
-        raw_infos.push(h.await.unwrap_or_else(|_| FileInfo {
-            duration_secs: 0.0,
-            tags: HashMap::new(),
-            bits_per_sample: 16,
-            has_cover_art: false,
-            has_media: false,
-        }));
-    }
-
-    // #15: 音声ストリームのないファイルをフィルタアウト
-    let mut media_files: Vec<(PathBuf, FileInfo)> = Vec::new();
-    for (path, info) in file_paths.into_iter().zip(raw_infos.into_iter()) {
-        if info.has_media {
-            media_files.push((path, info));
-        } else {
-            skip_results.push(FileResult::error(
-                path.to_string_lossy(),
-                "No audio stream found".to_string(),
-            ));
-        }
-    }
-
-    let file_count = media_files.len();
-
-    if file_count == 0 {
-        let error_count = skip_results.len();
-        if app.emit(
-            "conversion_complete",
-            CompletionPayload {
-                job_id,
-                results: skip_results,
-                success_count: 0,
-                error_count,
-            },
-        ).is_err() {
-            eprintln!("emit conversion_complete failed");
-        }
-        return;
-    }
-
-    let total_duration: f64 = media_files.iter().map(|(_, i)| i.duration_secs).sum::<f64>().max(1.0);
-
-    // Shared progress state: each file's completed seconds
-    let progress_secs = Arc::new(tokio::sync::Mutex::new(vec![0.0f64; file_count]));
-
     // ドロップされた元パスの親ディレクトリを基点にすることで、
     // ドロップしたフォルダ名自体も出力パスに含まれるようにする
     let base_dir: Option<PathBuf> = if settings.preserve_folder_structure
@@ -668,105 +622,134 @@ pub async fn run_conversion(
     let job_id = Arc::new(job_id);
     let sem = Arc::new(Semaphore::new(settings.parallel_count.max(1)));
     let dialog_sem = Arc::new(Semaphore::new(1)); // ダイアログは同時1件
-    let mut join_set: JoinSet<FileResult> = JoinSet::new();
 
-    for (i, (input_path, info)) in media_files.into_iter().enumerate() {
-        let sem = sem.clone();
-        let app = app.clone();
-        let job_id = job_id.clone();
-        let format = format.clone();
-        let settings = settings.clone();
-        let progress_secs = progress_secs.clone();
-        let file_duration = info.duration_secs;
-        let pgids_for_spawn = pgids.clone();
-        let base_dir = base_dir.clone();
-        let dialog_sem = dialog_sem.clone();
+    // probe 完了と変換完了を tokio::select! でパイプライン処理。
+    // probe が終わったファイルから即座に変換タスクをスポーンし、全 probe 完了待ちを排除。
+    let file_count = file_paths.len(); // 上限値（非メディアファイル分は progress 進捗に影響しない）
+    let progress_secs = Arc::new(tokio::sync::Mutex::new(vec![0.0f64; file_count]));
+    let total_duration = Arc::new(tokio::sync::Mutex::new(0.0f64)); // probe 完了ごとに加算
 
-        join_set.spawn(async move {
-            let _permit = sem.acquire().await.unwrap();
-
-            let output_path = match resolve_output_path(
-                &input_path, &format, &settings, base_dir.as_deref(), &app, &dialog_sem,
-            ).await {
-                Ok(p) => p,
-                Err(e) => return FileResult::error(input_path.to_string_lossy(), e.to_string()),
-            };
-
-            let input_display = input_path
-                .file_name()
-                .map(|n| n.to_string_lossy().into_owned())
-                .unwrap_or_default();
-
-            // #8: watch channel でスロットリング（unbounded spawn を排除）
-            let (progress_tx, mut progress_rx) = watch::channel(0.0f64);
-            let app_w = app.clone();
-            let job_id_w = job_id.clone();
-            let progress_secs_w = progress_secs.clone();
-            let name_w = input_display.clone();
-            tokio::spawn(async move {
-                while progress_rx.changed().await.is_ok() {
-                    let ratio = *progress_rx.borrow_and_update();
-                    let secs = ratio * file_duration;
-                    let percent = {
-                        let mut ps = progress_secs_w.lock().await;
-                        ps[i] = secs;
-                        (ps.iter().sum::<f64>() / total_duration * 100.0).min(100.0)
-                    };
-                    if app_w.emit("progress", ProgressPayload {
-                        job_id: (*job_id_w).clone(),
-                        percent,
-                        current_file: name_w.clone(),
-                        file_index: i,
-                        file_count,
-                    }).is_err() {
-                        eprintln!("emit progress failed");
-                    }
-                }
-            });
-
-            let result = convert_one(
-                &input_path,
-                &output_path,
-                &format,
-                &settings,
-                &info,
-                file_duration,
-                move |ratio| { let _ = progress_tx.send(ratio); },
-                move |pid| {
-                    let p = pgids_for_spawn.clone();
-                    tokio::spawn(async move { p.lock().await.push(pid as i32); });
-                },
-            )
-            .await;
-
-            // Mark this file as fully done for accurate final progress
-            {
-                let mut ps = progress_secs.lock().await;
-                ps[i] = file_duration;
-            }
-
-            match result {
-                Ok(()) => FileResult {
-                    input_path: input_path.to_string_lossy().into(),
-                    output_path: output_path.to_string_lossy().into(),
-                    success: true,
-                    error: None,
-                },
-                Err(e) => FileResult {
-                    input_path: input_path.to_string_lossy().into(),
-                    output_path: output_path.to_string_lossy().into(),
-                    success: false,
-                    error: Some(e.to_string()),
-                },
-            }
+    let mut probe_set: JoinSet<(usize, PathBuf, FileInfo)> = JoinSet::new();
+    for (i, path) in file_paths.into_iter().enumerate() {
+        probe_set.spawn(async move {
+            let info = probe_file(&path).await;
+            (i, path, info)
         });
     }
 
+    let mut conv_set: JoinSet<FileResult> = JoinSet::new();
     let mut results: Vec<FileResult> = skip_results;
-    while let Some(res) = join_set.join_next().await {
-        match res {
-            Ok(r) => results.push(r),
-            Err(e) => results.push(FileResult::error("", e.to_string())),
+
+    loop {
+        tokio::select! {
+            Some(Ok((i, path, info))) = probe_set.join_next(), if !probe_set.is_empty() => {
+                if !info.has_media {
+                    results.push(FileResult::error(
+                        path.to_string_lossy(),
+                        "No audio stream found".to_string(),
+                    ));
+                    continue;
+                }
+                {
+                    let mut td = total_duration.lock().await;
+                    *td = (*td + info.duration_secs).max(1.0);
+                }
+                let sem = sem.clone();
+                let app = app.clone();
+                let job_id = job_id.clone();
+                let format = format.clone();
+                let settings = settings.clone();
+                let progress_secs = progress_secs.clone();
+                let total_duration = total_duration.clone();
+                let file_duration = info.duration_secs;
+                let pgids_for_spawn = pgids.clone();
+                let base_dir = base_dir.clone();
+                let dialog_sem = dialog_sem.clone();
+
+                conv_set.spawn(async move {
+                    let _permit = sem.acquire().await.unwrap();
+
+                    let output_path = match resolve_output_path(
+                        &path, &format, &settings, base_dir.as_deref(), &app, &dialog_sem,
+                    ).await {
+                        Ok(p) => p,
+                        Err(e) => return FileResult::error(path.to_string_lossy(), e.to_string()),
+                    };
+
+                    let input_display = path
+                        .file_name()
+                        .map(|n| n.to_string_lossy().into_owned())
+                        .unwrap_or_default();
+
+                    // watch channel でスロットリング（unbounded spawn を排除）
+                    let (progress_tx, mut progress_rx) = watch::channel(0.0f64);
+                    let app_w = app.clone();
+                    let job_id_w = job_id.clone();
+                    let ps_w = progress_secs.clone();
+                    let td_w = total_duration.clone();
+                    let name_w = input_display.clone();
+                    tokio::spawn(async move {
+                        while progress_rx.changed().await.is_ok() {
+                            let ratio = *progress_rx.borrow_and_update();
+                            let secs = ratio * file_duration;
+                            let percent = {
+                                let mut ps = ps_w.lock().await;
+                                ps[i] = secs;
+                                let td = *td_w.lock().await;
+                                (ps.iter().sum::<f64>() / td * 100.0).min(100.0)
+                            };
+                            if app_w.emit("progress", ProgressPayload {
+                                job_id: (*job_id_w).clone(),
+                                percent,
+                                current_file: name_w.clone(),
+                                file_index: i,
+                                file_count,
+                            }).is_err() {
+                                eprintln!("emit progress failed");
+                            }
+                        }
+                    });
+
+                    let result = convert_one(
+                        &path,
+                        &output_path,
+                        &format,
+                        &settings,
+                        &info,
+                        file_duration,
+                        move |ratio| { let _ = progress_tx.send(ratio); },
+                        move |pid| {
+                            let p = pgids_for_spawn.clone();
+                            tokio::spawn(async move { p.lock().await.push(pid as i32); });
+                        },
+                    )
+                    .await;
+
+                    {
+                        let mut ps = progress_secs.lock().await;
+                        ps[i] = file_duration;
+                    }
+
+                    match result {
+                        Ok(()) => FileResult {
+                            input_path: path.to_string_lossy().into(),
+                            output_path: output_path.to_string_lossy().into(),
+                            success: true,
+                            error: None,
+                        },
+                        Err(e) => FileResult {
+                            input_path: path.to_string_lossy().into(),
+                            output_path: output_path.to_string_lossy().into(),
+                            success: false,
+                            error: Some(e.to_string()),
+                        },
+                    }
+                });
+            }
+            Some(Ok(result)) = conv_set.join_next(), if !conv_set.is_empty() => {
+                results.push(result);
+            }
+            else => break,
         }
     }
 

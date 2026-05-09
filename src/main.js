@@ -45,8 +45,7 @@ async function init() {
 
   await initSVGController(bgContainer, currentFormat, currentMode);
 
-  applyModeToUI();
-  applyFormatToUI();
+  applyModeToUI(); // 内部でapplyFormatToUI/applyDecodeFormatToUIを呼ぶ
 
   registerDragDrop();
   registerContextMenu();
