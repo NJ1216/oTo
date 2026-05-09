@@ -38,6 +38,7 @@ pub struct FileResult {
     pub input_path: String,
     pub output_path: String,
     pub success: bool,
+    pub skipped: bool,
     pub error: Option<String>,
 }
 
@@ -47,7 +48,18 @@ impl FileResult {
             input_path: input_path.into(),
             output_path: String::new(),
             success: false,
+            skipped: false,
             error: Some(msg.into()),
+        }
+    }
+
+    fn skipped(input_path: impl Into<String>) -> Self {
+        Self {
+            input_path: input_path.into(),
+            output_path: String::new(),
+            success: false,
+            skipped: true,
+            error: None,
         }
     }
 }
@@ -703,10 +715,7 @@ pub async fn run_conversion(
         tokio::select! {
             Some(Ok((i, path, info))) = probe_set.join_next(), if !probe_set.is_empty() => {
                 if !info.has_media {
-                    results.push(FileResult::error(
-                        path.to_string_lossy(),
-                        "No audio stream found".to_string(),
-                    ));
+                    results.push(FileResult::skipped(path.to_string_lossy()));
                     continue;
                 }
                 {
@@ -794,12 +803,14 @@ pub async fn run_conversion(
                             input_path: path.to_string_lossy().into(),
                             output_path: output_path.to_string_lossy().into(),
                             success: true,
+                            skipped: false,
                             error: None,
                         },
                         Err(e) => FileResult {
                             input_path: path.to_string_lossy().into(),
                             output_path: output_path.to_string_lossy().into(),
                             success: false,
+                            skipped: false,
                             error: Some(e.to_string()),
                         },
                     }
@@ -813,7 +824,7 @@ pub async fn run_conversion(
     }
 
     let success_count = results.iter().filter(|r| r.success).count();
-    let error_count = results.len() - success_count;
+    let error_count = results.iter().filter(|r| !r.success && !r.skipped).count();
 
     // 変換完了後に出力先をファイルマネージャで表示
     if settings.open_in_finder {

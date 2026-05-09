@@ -10,18 +10,11 @@ on:
   workflow_dispatch:        # 手動実行も可能
 
 # ─────────────────────────────────────────────
-# Job 1: ビルド（Mac / Windows を並列実行）
+# Job 1: Windows ビルド
 # ─────────────────────────────────────────────
 jobs:
   build:
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - platform: macos-latest
-          - platform: windows-latest
-
-    runs-on: ${{ matrix.platform }}
+    runs-on: windows-latest
 
     steps:
       - name: リポジトリをチェックアウト
@@ -36,7 +29,7 @@ jobs:
       - name: Rust インストール
         uses: dtolnay/rust-toolchain@stable
         with:
-          targets: ${{ matrix.platform == 'windows-latest' && 'x86_64-pc-windows-msvc' || '' }}
+          targets: x86_64-pc-windows-msvc
 
       - name: Rust ビルドキャッシュ
         uses: swatinem/rust-cache@v2
@@ -54,31 +47,17 @@ jobs:
         with:
           tauriScript: npm run tauri
 
-      # ── macOS: .dmg を保存 ───────────────────────
-      - name: Artifact 保存 (macOS)
-        if: matrix.platform == 'macos-latest'
-        uses: actions/upload-artifact@v4
-        with:
-          name: oTo-macOS
-          path: src-tauri/target/release/bundle/dmg/*.dmg
-          if-no-files-found: warn
-
       # ── Windows: ポータブル exe をリネーム ────────
-      - name: ポータブル exe を準備 (Windows)
-        if: matrix.platform == 'windows-latest'
+      - name: ポータブル exe を準備
         shell: pwsh
-        run: Copy-Item "src-tauri/target/release/oto.exe" "src-tauri/target/release/oTo-portable.exe"
+        run: Copy-Item "src-tauri/target/release/oto.exe" "src-tauri/target/release/oTo.exe"
 
-      # ── Windows: .msi / .exe / ポータブル を保存 ─
-      - name: Artifact 保存 (Windows)
-        if: matrix.platform == 'windows-latest'
+      # ── Windows: ポータブル exe を保存 ────────────
+      - name: Artifact 保存
         uses: actions/upload-artifact@v4
         with:
           name: oTo-Windows
-          path: |
-            src-tauri/target/release/bundle/msi/*.msi
-            src-tauri/target/release/bundle/nsis/*.exe
-            src-tauri/target/release/oTo-portable.exe
+          path: src-tauri/target/release/oTo.exe
           if-no-files-found: warn
 
 # ─────────────────────────────────────────────
@@ -108,8 +87,7 @@ jobs:
 
             | ファイル | 対象OS |
             |----------|--------|
-            | `*.dmg`  | macOS  |
-            | `*.msi`  | Windows（MSIインストーラー） |
-            | `*-Setup.exe` | Windows（NSSインストーラー） |
-            | `oTo-portable.exe` | Windows（インストール不要・単体実行ファイル） |
+            | `oTo.exe` | Windows（インストール不要・単体実行ファイル） |
+
+            **macOS** のバイナリは別途リリースページにアップロードされます。
           files: artifacts/**

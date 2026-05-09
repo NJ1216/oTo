@@ -222,7 +222,7 @@ function showCompletionToast(successCount, errorCount, results) {
     return;
   }
 
-  results?.filter((r) => !r.success).forEach((r) => {
+  results?.filter((r) => !r.success && !r.skipped).forEach((r) => {
     console.error(`[oTo] 変換失敗: ${r.inputPath}\n${r.error}`);
   });
 
