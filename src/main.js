@@ -14,6 +14,7 @@ let toastTimeout = null;
 let activeJobId = null;
 let jobCancelled = false;
 let currentDecodeFormat = 'wav';
+let homeDirPath = null;
 
 // --- DOM refs ---
 const bgContainer = document.getElementById('bg-container');
@@ -33,6 +34,8 @@ async function init() {
       language: '',
     };
   }
+
+  try { homeDirPath = await window.__TAURI__.path.homeDir(); } catch (_) {}
 
   await initI18n(appSettings.language || '');
   const title = t('window.main');
@@ -206,31 +209,75 @@ async function startConversion(paths) {
 }
 
 // --- Toast ---
+function getQualityInfo() {
+  if (!appSettings || currentMode !== 'encode') return null;
+  switch (currentFormat) {
+    case 'mp3':
+      if (appSettings.mp3Preset === 'custom') {
+        if (appSettings.mp3Mode === 'vbr') return `VBR Quality ${appSettings.mp3VbrQuality}`;
+        return `Bitrate ${appSettings.mp3Bitrate}kbps`;
+      }
+      return `Bitrate ${appSettings.mp3Preset}kbps`;
+    case 'm4a':
+      if (appSettings.aacPreset === 'custom') {
+        if (appSettings.aacMode === 'vbr') return `VBR Quality ${appSettings.aacVbrQuality}`;
+        return `Bitrate ${appSettings.m4aBitrate}kbps`;
+      }
+      return `Bitrate ${appSettings.aacPreset}kbps`;
+    case 'opus':
+      if (appSettings.opusPreset === 'custom') return `Bitrate ${appSettings.opusBitrate}kbps`;
+      return `Bitrate ${appSettings.opusPreset}kbps`;
+    case 'flac': {
+      const lvl = appSettings.flacPreset === 'custom' ? appSettings.flacCompression : appSettings.flacPreset;
+      return `Compression ${lvl}`;
+    }
+    case 'alac': {
+      const bits = appSettings.alacPreset === 'custom' ? appSettings.alacBitDepth : 16;
+      return `Lossless ${bits}bit`;
+    }
+    default:
+      return null;
+  }
+}
+
+function shortenPath(p) {
+  const normalized = p.replace(/\\/g, '/');
+  if (homeDirPath) {
+    const home = homeDirPath.replace(/\\/g, '/').replace(/\/$/, '');
+    if (normalized.startsWith(home)) return '~' + normalized.slice(home.length);
+  }
+  const parts = normalized.split('/');
+  return parts.length > 3 ? '…/' + parts.slice(-2).join('/') : p;
+}
+
 function showCompletionToast(successCount, errorCount, results) {
   if (successCount === 0 && errorCount === 0) {
     showToast(t('toast.noFiles'), 'warning', 4000);
     return;
   }
 
-  if (errorCount === 0) {
-    showToast(
-      successCount === 1
-        ? t('toast.done.one')
-        : t('toast.done.many', { n: successCount }),
-      'success'
-    );
-    return;
+  const failures = results?.filter((r) => !r.success && !r.skipped) ?? [];
+  failures.forEach((r) => console.error(`[oTo] 変換失敗: ${r.inputPath}\n${r.error}`));
+
+  const lines = [];
+
+  if (successCount > 0) {
+    lines.push(successCount === 1 ? t('toast.success.one') : t('toast.success.many', { n: successCount }));
+    const qi = getQualityInfo();
+    if (qi) lines.push(qi);
   }
 
-  results?.filter((r) => !r.success && !r.skipped).forEach((r) => {
-    console.error(`[oTo] 変換失敗: ${r.inputPath}\n${r.error}`);
-  });
-
-  if (successCount === 0) {
-    showToast(t('toast.fail.all', { n: errorCount }), 'error', 4000);
-  } else {
-    showToast(t('toast.fail.partial', { ok: successCount, err: errorCount }), 'warning', 4000);
+  if (errorCount > 0) {
+    lines.push(errorCount === 1 ? t('toast.fail.one') : t('toast.fail.many', { n: errorCount }));
+    if (failures.length > 0) {
+      lines.push(shortenPath(failures[0].inputPath));
+      if (failures[0].error) lines.push(failures[0].error);
+    }
   }
+
+  const type = errorCount > 0 ? (successCount > 0 ? 'warning' : 'error') : 'success';
+  const duration = errorCount > 0 ? 4000 : 2000;
+  showToast(lines.join('\n'), type, duration);
 }
 
 function showToast(message, type = 'success', duration = 2000) {

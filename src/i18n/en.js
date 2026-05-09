@@ -9,13 +9,13 @@ export default {
     about: 'About',
   },
   toast: {
-    done: {
-      one: 'Conversion complete\n(1 file)',
-      many: 'Conversion complete\n({n} files)',
+    success: {
+      one: '1 file converted',
+      many: '{n} files converted',
     },
     fail: {
-      all: 'Conversion failed ({n})\nsee DevTools for details',
-      partial: '{ok} succeeded / {err} failed\nsee DevTools for details',
+      one: '1 file failed',
+      many: '{n} files failed',
     },
     error: 'Error: {msg}',
     noFiles: 'No supported files found',

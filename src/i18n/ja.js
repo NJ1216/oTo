@@ -9,13 +9,13 @@ export default {
     about: 'バージョン情報',
   },
   toast: {
-    done: {
-      one: '変換完了\n(1ファイル)',
-      many: '変換完了\n({n}ファイル)',
+    success: {
+      one: '1件成功',
+      many: '{n}件成功',
     },
     fail: {
-      all: '変換失敗 ({n}件)\n詳細はDevToolsで確認',
-      partial: '{ok}件成功 / {err}件失敗\nDevToolsで詳細確認',
+      one: '1件失敗',
+      many: '{n}件失敗',
     },
     error: 'エラー: {msg}',
     noFiles: '対応ファイルが見つかりませんでした',
