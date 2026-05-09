@@ -9,7 +9,7 @@ const BADGE_CLASS = {
 };
 
 const LIBS = [
-  { name: 'oTo',             license: 'MIT',       url: 'https://github.com/' },
+  { name: 'oTo',             license: 'MIT',       url: 'https://github.com/NJ1216/oTo' },
   { sectionKey: 'about.libsSection.rust' },
   { name: 'tauri',           license: 'MIT',       url: 'https://tauri.app' },
   { name: 'FFmpeg',          license: 'LGPL 2.1+', url: 'https://ffmpeg.org' },

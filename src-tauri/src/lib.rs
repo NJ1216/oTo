@@ -60,6 +60,21 @@ async fn cancel_job(
                 unsafe { libc::kill(-pgid, libc::SIGKILL); }
             }
         }
+        #[cfg(windows)]
+        {
+            use windows_sys::Win32::Foundation::CloseHandle;
+            use windows_sys::Win32::System::Threading::{OpenProcess, TerminateProcess, PROCESS_TERMINATE};
+            let pids = job.pgids.lock().await;
+            for &pid in pids.iter() {
+                unsafe {
+                    let handle = OpenProcess(PROCESS_TERMINATE, 0, pid as u32);
+                    if handle != 0 {
+                        TerminateProcess(handle, 1);
+                        CloseHandle(handle);
+                    }
+                }
+            }
+        }
     }
     Ok(())
 }
@@ -78,6 +93,8 @@ async fn pause_job(
                 unsafe { libc::kill(-pgid, libc::SIGSTOP); }
             }
         }
+        #[cfg(windows)]
+        suspend_resume_windows_processes(&job.pgids, true).await;
     }
     Ok(())
 }
@@ -96,8 +113,50 @@ async fn resume_job(
                 unsafe { libc::kill(-pgid, libc::SIGCONT); }
             }
         }
+        #[cfg(windows)]
+        suspend_resume_windows_processes(&job.pgids, false).await;
     }
     Ok(())
+}
+
+/// Windows: 対象プロセスの全スレッドを一時停止または再開する
+#[cfg(windows)]
+async fn suspend_resume_windows_processes(
+    pids: &Arc<Mutex<Vec<i32>>>,
+    suspend: bool,
+) {
+    use windows_sys::Win32::Foundation::CloseHandle;
+    use windows_sys::Win32::System::Diagnostics::ToolHelp::{
+        CreateToolhelp32Snapshot, Thread32First, Thread32Next, THREADENTRY32, TH32CS_SNAPTHREAD,
+    };
+    use windows_sys::Win32::System::Threading::{OpenThread, ResumeThread, SuspendThread, THREAD_SUSPEND_RESUME};
+
+    let pids_guard = pids.lock().await;
+    for &pid in pids_guard.iter() {
+        unsafe {
+            let snapshot = CreateToolhelp32Snapshot(TH32CS_SNAPTHREAD, 0);
+            if snapshot == usize::MAX as _ {
+                continue;
+            }
+            let mut entry: THREADENTRY32 = std::mem::zeroed();
+            entry.dwSize = std::mem::size_of::<THREADENTRY32>() as u32;
+            if Thread32First(snapshot, &mut entry) != 0 {
+                loop {
+                    if entry.th32OwnerProcessID == pid as u32 {
+                        let thread = OpenThread(THREAD_SUSPEND_RESUME, 0, entry.dwThreadId);
+                        if thread != 0 {
+                            if suspend { SuspendThread(thread); } else { ResumeThread(thread); }
+                            CloseHandle(thread);
+                        }
+                    }
+                    if Thread32Next(snapshot, &mut entry) == 0 {
+                        break;
+                    }
+                }
+            }
+            CloseHandle(snapshot);
+        }
+    }
 }
 
 #[tauri::command]

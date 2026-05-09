@@ -202,12 +202,17 @@ async function startConversion(paths) {
     isProcessing = false;
     activeJobId = null;
     setState('standby');
-    showToast(t('toast.error', { msg: e }), 'error');
+    showToast(t('toast.error', { msg: e }), 'error', 4000);
   }
 }
 
 // --- Toast ---
 function showCompletionToast(successCount, errorCount, results) {
+  if (successCount === 0 && errorCount === 0) {
+    showToast(t('toast.noFiles'), 'warning', 4000);
+    return;
+  }
+
   if (errorCount === 0) {
     showToast(
       successCount === 1
@@ -223,9 +228,9 @@ function showCompletionToast(successCount, errorCount, results) {
   });
 
   if (successCount === 0) {
-    showToast(t('toast.fail.all', { n: errorCount }), 'error');
+    showToast(t('toast.fail.all', { n: errorCount }), 'error', 4000);
   } else {
-    showToast(t('toast.fail.partial', { ok: successCount, err: errorCount }), 'warning');
+    showToast(t('toast.fail.partial', { ok: successCount, err: errorCount }), 'warning', 4000);
   }
 }
 

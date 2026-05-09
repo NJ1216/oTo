@@ -117,6 +117,7 @@ pub fn collect_audio_files(paths: &[String]) -> Vec<PathBuf> {
             }
         }
     }
+    files.sort(); // 辞書順で安定化
     files
 }
 
@@ -138,7 +139,7 @@ fn common_ancestor(paths: &[PathBuf]) -> Option<PathBuf> {
 
 async fn probe_file(path: &Path) -> FileInfo {
     let ffprobe = ffprobe_path();
-    let output = tokio::process::Command::new(&ffprobe)
+    let output = match tokio::process::Command::new(&ffprobe)
         .args([
             "-v",
             "quiet",
@@ -150,7 +151,13 @@ async fn probe_file(path: &Path) -> FileInfo {
         ])
         .output()
         .await
-        .ok();
+    {
+        Ok(o) => Some(o),
+        Err(e) => {
+            eprintln!("ffprobe spawn failed for {}: {e}", path.display());
+            None
+        }
+    };
 
     let mut duration = 0.0f64;
     let mut tags = HashMap::new();
@@ -390,6 +397,20 @@ async fn convert_one(
     on_progress: impl Fn(f64) + Send,
     on_pid: impl Fn(u32) + Send,
 ) -> Result<()> {
+    // キャンセルやエラー時に不完全な出力ファイルを削除するガード
+    struct OutputGuard {
+        path: PathBuf,
+        keep: bool,
+    }
+    impl Drop for OutputGuard {
+        fn drop(&mut self) {
+            if !self.keep {
+                let _ = std::fs::remove_file(&self.path);
+            }
+        }
+    }
+    let mut output_guard = OutputGuard { path: output.to_path_buf(), keep: false };
+
     let ffmpeg = ffmpeg_path();
     let mut args: Vec<String> = vec![
         "-y".into(),
@@ -502,6 +523,7 @@ async fn convert_one(
         let _ = std::fs::remove_file(input);
     }
 
+    output_guard.keep = true; // 正常完了：出力ファイルを保持
     Ok(())
 }
 
@@ -553,7 +575,10 @@ pub async fn run_conversion(
                     format!("File size exceeds 10 GiB limit ({:.1} GiB)", meta.len() as f64 / 1_073_741_824.0),
                 ));
             }
-            _ => file_paths.push(path),
+            Ok(_) => file_paths.push(path),
+            Err(e) => {
+                skip_results.push(FileResult::error(path.to_string_lossy(), e.to_string()));
+            }
         }
     }
 
@@ -719,12 +744,19 @@ pub async fn run_conversion(
     let success_count = results.iter().filter(|r| r.success).count();
     let error_count = results.len() - success_count;
 
-    // Open in Finder for the first successful output
+    // 変換完了後に出力先をファイルマネージャで表示
     if settings.open_in_finder {
         if let Some(first_success) = results.iter().find(|r| r.success) {
-            let _ = tokio::process::Command::new("open")
-                .arg("-R")
-                .arg(&first_success.output_path)
+            let path = &first_success.output_path;
+            #[cfg(target_os = "macos")]
+            let _ = tokio::process::Command::new("open").arg("-R").arg(path).spawn();
+            #[cfg(target_os = "windows")]
+            let _ = tokio::process::Command::new("explorer")
+                .arg(format!("/select,{}", path))
+                .spawn();
+            #[cfg(target_os = "linux")]
+            let _ = tokio::process::Command::new("xdg-open")
+                .arg(std::path::Path::new(path).parent().unwrap_or(std::path::Path::new(".")))
                 .spawn();
         }
     }

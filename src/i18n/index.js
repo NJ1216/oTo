@@ -30,5 +30,6 @@ export async function initI18n(lang) {
   const resolved = resolve(lang);
   const mod = await import(`./${resolved}.js`);
   _dict = mod.default;
+  document.documentElement.lang = resolved;
   applyDOM();
 }

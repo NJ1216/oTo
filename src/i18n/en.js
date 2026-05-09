@@ -14,10 +14,11 @@ export default {
       many: 'Conversion complete\n({n} files)',
     },
     fail: {
-      all: 'Conversion failed ({n}) — see DevTools for details',
-      partial: '{ok} succeeded / {err} failed — see DevTools for details',
+      all: 'Conversion failed ({n})\nsee DevTools for details',
+      partial: '{ok} succeeded / {err} failed\nsee DevTools for details',
     },
     error: 'Error: {msg}',
+    noFiles: 'No supported files found',
   },
   settings: {
     title: 'Settings',

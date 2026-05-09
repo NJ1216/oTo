@@ -14,10 +14,11 @@ export default {
       many: '変換完了\n({n}ファイル)',
     },
     fail: {
-      all: '変換失敗 ({n}件) — 詳細はDevToolsで確認',
-      partial: '{ok}件成功 / {err}件失敗 — DevToolsで詳細確認',
+      all: '変換失敗 ({n}件)\n詳細はDevToolsで確認',
+      partial: '{ok}件成功 / {err}件失敗\nDevToolsで詳細確認',
     },
     error: 'エラー: {msg}',
+    noFiles: '対応ファイルが見つかりませんでした',
   },
   settings: {
     title: '設定',

@@ -49,6 +49,9 @@ fn default_aac_mode() -> String     { "cbr".into() }
 fn default_m4a_bitrate() -> u32     { 128 }
 fn default_aac_vbr_quality() -> u32 { 4 }
 fn default_opus_mode() -> String    { "vbr".into() }
+fn default_flac_compression() -> u8 { 5 }
+fn default_last_mode() -> String    { "encode".into() }
+fn default_last_format() -> String  { "mp3".into() }
 
 fn calc_parallel_count(full_power: bool) -> usize {
     let cpu_count = std::thread::available_parallelism()
@@ -105,6 +108,7 @@ pub struct Settings {
     // FLAC
     #[serde(default = "default_flac_preset")]
     pub flac_preset: String,
+    #[serde(default = "default_flac_compression")]
     pub flac_compression: u8,
 
     // ALAC
@@ -118,8 +122,11 @@ pub struct Settings {
     pub parallel_count: usize,
     #[serde(default)]
     pub full_power: bool,
+    #[serde(default)]
     pub open_in_finder: bool,
+    #[serde(default = "default_last_mode")]
     pub last_mode: String,
+    #[serde(default = "default_last_format")]
     pub last_format: String,
     #[serde(default = "default_last_decode_format")]
     pub last_decode_format: String,
