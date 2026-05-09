@@ -220,6 +220,17 @@ fn get_app_version() -> String {
     format!("{} (build {})", env!("CARGO_PKG_VERSION"), env!("GIT_HASH"))
 }
 
+#[tauri::command]
+fn open_url(url: String) -> Result<(), String> {
+    #[cfg(target_os = "macos")]
+    std::process::Command::new("open").arg(&url).spawn().map_err(|e| e.to_string())?;
+    #[cfg(target_os = "windows")]
+    std::process::Command::new("cmd").args(["/C", "start", "", &url]).spawn().map_err(|e| e.to_string())?;
+    #[cfg(target_os = "linux")]
+    std::process::Command::new("xdg-open").arg(&url).spawn().map_err(|e| e.to_string())?;
+    Ok(())
+}
+
 // --- App entry ---
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -242,7 +253,57 @@ pub fn run() {
             open_about_window,
             pick_folder,
             get_app_version,
+            open_url,
         ])
+        .setup(|app| {
+            #[cfg(target_os = "macos")]
+            {
+                use tauri::menu::{MenuBuilder, PredefinedMenuItem, SubmenuBuilder, MenuItem};
+
+                let h = app.handle();
+
+                // 「about oTo」クリックでカスタムウィンドウを開くメニュー項目
+                let about_item = MenuItem::with_id(h, "open_about", "oTo について", true, None::<&str>)?;
+
+                // アプリメニューのみ（File / Edit / View / Window / Help は含めない）
+                let app_menu = SubmenuBuilder::new(h, "oTo")
+                    .item(&about_item)
+                    .separator()
+                    .item(&PredefinedMenuItem::services(h, None)?)
+                    .separator()
+                    .item(&PredefinedMenuItem::hide(h, None)?)
+                    .item(&PredefinedMenuItem::hide_others(h, None)?)
+                    .item(&PredefinedMenuItem::show_all(h, None)?)
+                    .separator()
+                    .item(&PredefinedMenuItem::quit(h, None)?)
+                    .build()?;
+
+                let menu = MenuBuilder::new(h).item(&app_menu).build()?;
+                app.set_menu(menu)?;
+            }
+            Ok(())
+        })
+        .on_menu_event(|app, event| {
+            if event.id().as_ref() == "open_about" {
+                let app = app.clone();
+                tauri::async_runtime::spawn(async move {
+                    if let Some(win) = app.get_webview_window("about") {
+                        let _ = win.show();
+                        let _ = win.set_focus();
+                    } else {
+                        let _ = WebviewWindowBuilder::new(
+                            &app,
+                            "about",
+                            tauri::WebviewUrl::App("about/about.html".into()),
+                        )
+                        .title("oTo - About")
+                        .inner_size(400.0, 460.0)
+                        .resizable(false)
+                        .build();
+                    }
+                });
+            }
+        })
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }

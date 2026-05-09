@@ -2,6 +2,8 @@ import { initI18n, t } from '../i18n/index.js';
 
 const { invoke } = window.__TAURI__.core;
 
+const GITHUB_URL = 'https://github.com/NJ1216/oTo';
+
 const BADGE_CLASS = {
   'MIT':        'badge-mit',
   'LGPL 2.1+':  'badge-lgpl',
@@ -9,7 +11,7 @@ const BADGE_CLASS = {
 };
 
 const LIBS = [
-  { name: 'oTo',             license: 'MIT',       url: 'https://github.com/NJ1216/oTo' },
+  { name: 'oTo',             license: 'MIT',       url: GITHUB_URL },
   { sectionKey: 'about.libsSection.rust' },
   { name: 'tauri',           license: 'MIT',       url: 'https://tauri.app' },
   { name: 'FFmpeg',          license: 'LGPL 2.1+', url: 'https://ffmpeg.org' },
@@ -23,6 +25,10 @@ const LIBS = [
   { name: '@tauri-apps/api', license: 'MIT',       url: 'https://tauri.app' },
 ];
 
+function openUrl(url) {
+  invoke('open_url', { url }).catch(console.error);
+}
+
 function buildLibList() {
   const container = document.getElementById('lib-list');
   for (const item of LIBS) {
@@ -33,7 +39,7 @@ function buildLibList() {
       container.appendChild(el);
     } else {
       const row = document.createElement('div');
-      row.className = 'lib-row';
+      row.className = 'lib-row' + (item.url ? ' lib-row-link' : '');
 
       const name = document.createElement('span');
       name.className = 'lib-name';
@@ -45,6 +51,11 @@ function buildLibList() {
 
       row.appendChild(name);
       row.appendChild(badge);
+
+      if (item.url) {
+        row.addEventListener('click', () => openUrl(item.url));
+      }
+
       container.appendChild(row);
     }
   }
@@ -65,6 +76,11 @@ async function init() {
 
   const version = await invoke('get_app_version');
   document.getElementById('version-text').textContent = version;
+
+  document.getElementById('github-link').addEventListener('click', (e) => {
+    e.preventDefault();
+    openUrl(GITHUB_URL);
+  });
 }
 
 document.getElementById('close-btn').addEventListener('click', () => {

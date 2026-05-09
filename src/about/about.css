@@ -170,3 +170,32 @@ h2 {
 #close-btn:hover {
   background: rgba(255, 255, 255, 0.18);
 }
+
+/* --- GitHub link --- */
+
+#github-link {
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.38);
+  text-decoration: none;
+  cursor: pointer;
+  transition: color 0.15s;
+}
+
+#github-link:hover {
+  color: rgba(255, 255, 255, 0.75);
+  text-decoration: underline;
+}
+
+/* --- Clickable lib rows --- */
+
+.lib-row-link {
+  cursor: pointer;
+  transition: background 0.12s;
+  border-radius: 5px;
+  padding-left: 4px;
+  padding-right: 4px;
+}
+
+.lib-row-link:hover {
+  background: rgba(255, 255, 255, 0.07);
+}

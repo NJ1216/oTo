@@ -5,88 +5,70 @@ name: Build & Release
 # ─────────────────────────────────────────────
 on:
   push:
-    branches: [main]        # mainへのpush → ビルドしてArtifactに保存
+    branches: [main]        # mainへのpush → ビルド + Artifact保存
     tags:
-      - 'v*'                # v1.0.0 などのタグpush → GitHub Releaseを作成
+      - 'v*'                # v1.0.0 などのタグpush → Draft Releaseも作成
   workflow_dispatch:        # GitHub画面から手動実行も可能
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true   # Node.js 20 非推奨警告を解消
 
+# ─────────────────────────────────────────────
+# Job 1: ビルド（Mac / Windows を並列実行）
+# ─────────────────────────────────────────────
 jobs:
   build:
     strategy:
-      fail-fast: false      # 一方が失敗しても他方は続行する
+      fail-fast: false
       matrix:
         include:
-          - platform: macos-latest    # Mac用ビルド
-          - platform: windows-latest  # Windows用ビルド
+          - platform: macos-latest
+          - platform: windows-latest
 
     runs-on: ${{ matrix.platform }}
 
     steps:
-      # ① リポジトリのコードを取得
       - name: リポジトリをチェックアウト
         uses: actions/checkout@v4
 
-      # ② Node.js をセットアップ
       - name: Node.js セットアップ
         uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: 'npm'
 
-      # ③ Rust (stable) をインストール
       - name: Rust インストール
         uses: dtolnay/rust-toolchain@stable
         with:
           targets: ${{ matrix.platform == 'windows-latest' && 'x86_64-pc-windows-msvc' || '' }}
 
-      # ④ Rust のビルドキャッシュ（2回目以降を大幅に高速化）
       - name: Rust ビルドキャッシュ
         uses: swatinem/rust-cache@v2
         with:
           workspaces: './src-tauri -> target'
 
-      # ⑤ npm パッケージをインストール
       - name: npm パッケージインストール
         run: npm ci
 
-      # ─── タグ push 時: ビルド + GitHub Release 作成 ───────────────
-      - name: ビルド & GitHub Release 作成 (タグ push 時)
-        if: startsWith(github.ref, 'refs/tags/')
-        uses: tauri-apps/tauri-action@v0
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          tauriScript: npm run tauri
-          tagName: ${{ github.ref_name }}
-          releaseName: 'oTo ${{ github.ref_name }}'
-          releaseBody: 'アセット（Assets）からお使いのOSに合ったファイルをダウンロードしてください。'
-          releaseDraft: false
-          prerelease: false
-
-      # ─── 通常 push 時: ビルドのみ ─────────────────────────────────
-      - name: ビルド (通常 push 時)
-        if: ${{ !startsWith(github.ref, 'refs/tags/') }}
+      - name: Tauri ビルド
         uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           tauriScript: npm run tauri
 
-      # ⑥ ビルド成果物を保存 — macOS (.dmg)
+      # ── macOS: .dmg を保存 ───────────────────────
       - name: Artifact 保存 (macOS)
-        if: ${{ !startsWith(github.ref, 'refs/tags/') && matrix.platform == 'macos-latest' }}
+        if: matrix.platform == 'macos-latest'
         uses: actions/upload-artifact@v4
         with:
           name: oTo-macOS
           path: src-tauri/target/release/bundle/dmg/*.dmg
           if-no-files-found: warn
 
-      # ⑦ ビルド成果物を保存 — Windows (.msi / .exe)
+      # ── Windows: .msi / .exe を保存 ─────────────
       - name: Artifact 保存 (Windows)
-        if: ${{ !startsWith(github.ref, 'refs/tags/') && matrix.platform == 'windows-latest' }}
+        if: matrix.platform == 'windows-latest'
         uses: actions/upload-artifact@v4
         with:
           name: oTo-Windows
@@ -94,3 +76,35 @@ jobs:
             src-tauri/target/release/bundle/msi/*.msi
             src-tauri/target/release/bundle/nsis/*.exe
           if-no-files-found: warn
+
+# ─────────────────────────────────────────────
+# Job 2: Draft Release 作成（タグ push 時のみ）
+# ─────────────────────────────────────────────
+  release:
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: ビルド成果物をダウンロード
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          merge-multiple: true
+
+      - name: GitHub Releases に Draft として登録
+        uses: softprops/action-gh-release@v2
+        with:
+          draft: true
+          name: 'oTo ${{ github.ref_name }}'
+          body: |
+            アセット（Assets）からお使いのOSに合ったファイルをダウンロードしてください。
+
+            | ファイル | 対象OS |
+            |----------|--------|
+            | `*.dmg`  | macOS  |
+            | `*.msi`  | Windows（MSIインストーラー） |
+            | `*.exe`  | Windows（NSSインストーラー） |
+          files: artifacts/**
