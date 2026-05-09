@@ -4,15 +4,10 @@ name: Build & Release
 # トリガー設定
 # ─────────────────────────────────────────────
 on:
-  # push/tagトリガーは一時停止中。ローカルWindowsビルド確認後に再有効化予定。
-  # push:
-  #   branches: [main]
-  #   tags:
-  #     - 'v*'
-  workflow_dispatch:        # 手動実行のみ有効
-
-env:
-  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true   # Node.js 20 非推奨警告を解消
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:        # 手動実行も可能
 
 # ─────────────────────────────────────────────
 # Job 1: ビルド（Mac / Windows を並列実行）
@@ -47,6 +42,7 @@ jobs:
         uses: swatinem/rust-cache@v2
         with:
           workspaces: './src-tauri -> target'
+          cache-on-failure: true
 
       - name: npm パッケージインストール
         run: npm ci
@@ -67,7 +63,13 @@ jobs:
           path: src-tauri/target/release/bundle/dmg/*.dmg
           if-no-files-found: warn
 
-      # ── Windows: .msi / .exe を保存 ─────────────
+      # ── Windows: ポータブル exe をリネーム ────────
+      - name: ポータブル exe を準備 (Windows)
+        if: matrix.platform == 'windows-latest'
+        shell: pwsh
+        run: Copy-Item "src-tauri/target/release/oto.exe" "src-tauri/target/release/oTo-portable.exe"
+
+      # ── Windows: .msi / .exe / ポータブル を保存 ─
       - name: Artifact 保存 (Windows)
         if: matrix.platform == 'windows-latest'
         uses: actions/upload-artifact@v4
@@ -76,6 +78,7 @@ jobs:
           path: |
             src-tauri/target/release/bundle/msi/*.msi
             src-tauri/target/release/bundle/nsis/*.exe
+            src-tauri/target/release/oTo-portable.exe
           if-no-files-found: warn
 
 # ─────────────────────────────────────────────
@@ -107,5 +110,6 @@ jobs:
             |----------|--------|
             | `*.dmg`  | macOS  |
             | `*.msi`  | Windows（MSIインストーラー） |
-            | `*.exe`  | Windows（NSSインストーラー） |
+            | `*-Setup.exe` | Windows（NSSインストーラー） |
+            | `oTo-portable.exe` | Windows（インストール不要・単体実行ファイル） |
           files: artifacts/**
