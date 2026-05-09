@@ -6,16 +6,11 @@ use std::process::Stdio;
 use std::sync::Arc;
 use tauri::{AppHandle, Emitter};
 use tokio::io::{AsyncBufReadExt, BufReader};
-use tokio::sync::Semaphore;
+use tokio::sync::{watch, Semaphore};
 use tokio::task::JoinSet;
 use walkdir::WalkDir;
 
 use crate::settings::{NameConflict, OutputDest, Settings, SourceFileAction};
-
-const SUPPORTED_EXTS: &[&str] = &[
-    "wav", "mp3", "m4a", "aac", "flac", "alac", "opus", "aiff", "aif", "wma",
-    "mp4", "mov", "mkv", "avi",
-];
 
 const MAX_FILE_SIZE: u64 = 10 * 1024 * 1024 * 1024; // 10 GiB
 
@@ -67,11 +62,11 @@ pub struct CompletionPayload {
 }
 
 struct FileInfo {
-    path: PathBuf,
     duration_secs: f64,
     tags: HashMap<String, String>,
     bits_per_sample: u32,
     has_cover_art: bool,
+    has_media: bool,
 }
 
 // --- FFmpeg/FFprobe path resolution ---
@@ -101,20 +96,10 @@ pub fn collect_audio_files(paths: &[String]) -> Vec<PathBuf> {
                 .filter_map(|e| e.ok())
                 .filter(|e| e.file_type().is_file())
             {
-                if let Some(ext) = entry.path().extension() {
-                    let ext_lower = ext.to_string_lossy().to_lowercase();
-                    if SUPPORTED_EXTS.contains(&ext_lower.as_str()) {
-                        files.push(entry.path().to_path_buf());
-                    }
-                }
+                files.push(entry.path().to_path_buf());
             }
         } else if path.is_file() {
-            if let Some(ext) = path.extension() {
-                let ext_lower = ext.to_string_lossy().to_lowercase();
-                if SUPPORTED_EXTS.contains(&ext_lower.as_str()) {
-                    files.push(path);
-                }
-            }
+            files.push(path);
         }
     }
     files.sort(); // 辞書順で安定化
@@ -163,6 +148,7 @@ async fn probe_file(path: &Path) -> FileInfo {
     let mut tags = HashMap::new();
     let mut bits_per_sample = 16u32;
     let mut has_cover_art = false;
+    let mut has_media = false;
 
     if let Some(out) = output {
         if let Ok(json) = serde_json::from_slice::<serde_json::Value>(&out.stdout) {
@@ -180,6 +166,7 @@ async fn probe_file(path: &Path) -> FileInfo {
                 for stream in streams {
                     match stream["codec_type"].as_str().unwrap_or("") {
                         "audio" => {
+                            has_media = true;
                             if let Some(stream_tags) = stream["tags"].as_object() {
                                 for (k, v) in stream_tags {
                                     if let Some(s) = v.as_str() {
@@ -211,21 +198,34 @@ async fn probe_file(path: &Path) -> FileInfo {
     }
 
     FileInfo {
-        path: path.to_path_buf(),
         duration_secs: duration,
         tags,
         bits_per_sample,
         has_cover_art,
+        has_media,
     }
 }
 
 // --- Output path resolution ---
 
-fn resolve_output_path(
+async fn ask_overwrite_dialog(app: &AppHandle, filename: &str) -> bool {
+    use tauri_plugin_dialog::{DialogExt, MessageDialogButtons};
+    let (tx, rx) = tokio::sync::oneshot::channel::<bool>();
+    app.dialog()
+        .message(format!("\"{}\" はすでに存在します。上書きしますか？", filename))
+        .title("ファイルの競合")
+        .buttons(MessageDialogButtons::OkCancelCustom("上書き".into(), "別名保存".into()))
+        .show(move |result| { let _ = tx.send(result); });
+    rx.await.unwrap_or(false)
+}
+
+async fn resolve_output_path(
     input: &Path,
     format: &str,
     settings: &Settings,
     base_dir: Option<&Path>,
+    app: &AppHandle,
+    dialog_sem: &Semaphore,
 ) -> Result<PathBuf> {
     let stem = input
         .file_stem()
@@ -273,14 +273,29 @@ fn resolve_output_path(
     }
 
     match settings.name_conflict {
-        NameConflict::AutoRename | NameConflict::ConfirmDialog => {
+        NameConflict::AutoRename => {
             let mut i = 1u32;
             loop {
-                let name = format!("{}_{}.{}", stem, i, format);
+                let name = format!("{}_{}.{}", stem, i, ext);
                 let path = output_dir.join(&name);
-                if !path.exists() {
-                    return Ok(path);
-                }
+                if !path.exists() { return Ok(path); }
+                i += 1;
+            }
+        }
+        NameConflict::ConfirmDialog => {
+            let _permit = dialog_sem.acquire().await;
+            let display = candidate.file_name()
+                .map(|n| n.to_string_lossy().into_owned())
+                .unwrap_or_else(|| filename.clone());
+            if ask_overwrite_dialog(app, &display).await {
+                return Ok(candidate); // 上書き
+            }
+            // 別名保存
+            let mut i = 1u32;
+            loop {
+                let name = format!("{}_{}.{}", stem, i, ext);
+                let path = output_dir.join(&name);
+                if !path.exists() { return Ok(path); }
                 i += 1;
             }
         }
@@ -582,7 +597,40 @@ pub async fn run_conversion(
         }
     }
 
-    let file_count = file_paths.len();
+    // Probe all size-valid files in parallel (order preserved via indexed join)
+    let probe_handles: Vec<_> = file_paths
+        .iter()
+        .map(|p| {
+            let path = p.clone();
+            tokio::spawn(async move { probe_file(&path).await })
+        })
+        .collect();
+
+    let mut raw_infos: Vec<FileInfo> = Vec::with_capacity(file_paths.len());
+    for h in probe_handles {
+        raw_infos.push(h.await.unwrap_or_else(|_| FileInfo {
+            duration_secs: 0.0,
+            tags: HashMap::new(),
+            bits_per_sample: 16,
+            has_cover_art: false,
+            has_media: false,
+        }));
+    }
+
+    // #15: 音声ストリームのないファイルをフィルタアウト
+    let mut media_files: Vec<(PathBuf, FileInfo)> = Vec::new();
+    for (path, info) in file_paths.into_iter().zip(raw_infos.into_iter()) {
+        if info.has_media {
+            media_files.push((path, info));
+        } else {
+            skip_results.push(FileResult::error(
+                path.to_string_lossy(),
+                "No audio stream found".to_string(),
+            ));
+        }
+    }
+
+    let file_count = media_files.len();
 
     if file_count == 0 {
         let error_count = skip_results.len();
@@ -600,27 +648,7 @@ pub async fn run_conversion(
         return;
     }
 
-    // Probe all files in parallel (order preserved via indexed join)
-    let probe_handles: Vec<_> = file_paths
-        .iter()
-        .map(|p| {
-            let path = p.clone();
-            tokio::spawn(async move { probe_file(&path).await })
-        })
-        .collect();
-
-    let mut file_infos: Vec<FileInfo> = Vec::with_capacity(file_count);
-    for h in probe_handles {
-        file_infos.push(h.await.unwrap_or_else(|_| FileInfo {
-            path: PathBuf::new(),
-            duration_secs: 0.0,
-            tags: HashMap::new(),
-            bits_per_sample: 16,
-            has_cover_art: false,
-        }));
-    }
-
-    let total_duration: f64 = file_infos.iter().map(|i| i.duration_secs).sum::<f64>().max(1.0);
+    let total_duration: f64 = media_files.iter().map(|(_, i)| i.duration_secs).sum::<f64>().max(1.0);
 
     // Shared progress state: each file's completed seconds
     let progress_secs = Arc::new(tokio::sync::Mutex::new(vec![0.0f64; file_count]));
@@ -639,35 +667,62 @@ pub async fn run_conversion(
     let settings = Arc::new(settings);
     let job_id = Arc::new(job_id);
     let sem = Arc::new(Semaphore::new(settings.parallel_count.max(1)));
+    let dialog_sem = Arc::new(Semaphore::new(1)); // ダイアログは同時1件
     let mut join_set: JoinSet<FileResult> = JoinSet::new();
 
-    for (i, info) in file_infos.into_iter().enumerate() {
+    for (i, (input_path, info)) in media_files.into_iter().enumerate() {
         let sem = sem.clone();
         let app = app.clone();
         let job_id = job_id.clone();
         let format = format.clone();
         let settings = settings.clone();
         let progress_secs = progress_secs.clone();
-        let input_path = info.path.clone();
         let file_duration = info.duration_secs;
         let pgids_for_spawn = pgids.clone();
         let base_dir = base_dir.clone();
+        let dialog_sem = dialog_sem.clone();
 
         join_set.spawn(async move {
             let _permit = sem.acquire().await.unwrap();
 
-            let output_path = match resolve_output_path(&input_path, &format, &settings, base_dir.as_deref()) {
+            let output_path = match resolve_output_path(
+                &input_path, &format, &settings, base_dir.as_deref(), &app, &dialog_sem,
+            ).await {
                 Ok(p) => p,
                 Err(e) => return FileResult::error(input_path.to_string_lossy(), e.to_string()),
             };
 
-            let app2 = app.clone();
-            let job_id2 = job_id.clone();
-            let progress_secs2 = progress_secs.clone();
             let input_display = input_path
                 .file_name()
                 .map(|n| n.to_string_lossy().into_owned())
                 .unwrap_or_default();
+
+            // #8: watch channel でスロットリング（unbounded spawn を排除）
+            let (progress_tx, mut progress_rx) = watch::channel(0.0f64);
+            let app_w = app.clone();
+            let job_id_w = job_id.clone();
+            let progress_secs_w = progress_secs.clone();
+            let name_w = input_display.clone();
+            tokio::spawn(async move {
+                while progress_rx.changed().await.is_ok() {
+                    let ratio = *progress_rx.borrow_and_update();
+                    let secs = ratio * file_duration;
+                    let percent = {
+                        let mut ps = progress_secs_w.lock().await;
+                        ps[i] = secs;
+                        (ps.iter().sum::<f64>() / total_duration * 100.0).min(100.0)
+                    };
+                    if app_w.emit("progress", ProgressPayload {
+                        job_id: (*job_id_w).clone(),
+                        percent,
+                        current_file: name_w.clone(),
+                        file_index: i,
+                        file_count,
+                    }).is_err() {
+                        eprintln!("emit progress failed");
+                    }
+                }
+            });
 
             let result = convert_one(
                 &input_path,
@@ -676,33 +731,7 @@ pub async fn run_conversion(
                 &settings,
                 &info,
                 file_duration,
-                move |ratio| {
-                    let secs = ratio * file_duration;
-                    let app = app2.clone();
-                    let job_id = job_id2.clone();
-                    let progress_secs = progress_secs2.clone();
-                    let name = input_display.clone();
-                    tokio::spawn(async move {
-                        let percent = {
-                            let mut ps = progress_secs.lock().await;
-                            ps[i] = secs;
-                            let completed: f64 = ps.iter().sum();
-                            (completed / total_duration * 100.0).min(100.0)
-                        };
-                        if app.emit(
-                            "progress",
-                            ProgressPayload {
-                                job_id: (*job_id).clone(),
-                                percent,
-                                current_file: name,
-                                file_index: i,
-                                file_count,
-                            },
-                        ).is_err() {
-                            eprintln!("emit progress failed");
-                        }
-                    });
-                },
+                move |ratio| { let _ = progress_tx.send(ratio); },
                 move |pid| {
                     let p = pgids_for_spawn.clone();
                     tokio::spawn(async move { p.lock().await.push(pid as i32); });
