@@ -46,7 +46,9 @@ jobs:
       # ── Windows: ポータブル exe をリネーム ────────
       - name: ポータブル exe を準備
         shell: pwsh
-        run: Copy-Item "src-tauri/target/release/oto.exe" "src-tauri/target/release/oTo.exe"
+        run: |
+          Move-Item "src-tauri/target/release/oto.exe" "src-tauri/target/release/_oTo_tmp.exe"
+          Rename-Item "src-tauri/target/release/_oTo_tmp.exe" "oTo.exe"
 
       # ── Windows: ポータブル exe を保存 ────────────
       - name: Artifact 保存
