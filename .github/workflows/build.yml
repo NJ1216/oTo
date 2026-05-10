@@ -41,11 +41,7 @@ jobs:
         run: npm ci
 
       - name: Tauri ビルド
-        uses: tauri-apps/tauri-action@v0
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          tauriScript: npm run tauri
+        run: npm run tauri -- build --no-bundle
 
       # ── Windows: ポータブル exe をリネーム ────────
       - name: ポータブル exe を準備
