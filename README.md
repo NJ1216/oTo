@@ -6,6 +6,8 @@
 
 macOS / Windows 向けのシンプルで高速なオーディオ変換アプリ。FFmpeg をサブプロセスとして呼び出し、ドラッグ＆ドロップによりファイルを選択して、mp3, aac, opus, flac, alac へのオーディオフォーマットへの変換を行います。
 
+![App Workflow (Jp)](img/app-workflow-ja.jpg)
+
 ## アプリ名の由来
 **oTo**（オト）は、日本語の「**音**」という言葉の響きと、データの変換（mp3 **to** wav 等）や橋渡しを意味する「**to**」を組み合わせた名前です。
 
@@ -132,6 +134,8 @@ Copyright © 2026 Akito Matsuda
 
 ### Application Name Origin
 **oTo** (Oto) is a combination of the Japanese word "**音**" (sound) and "**to**", which represents both data conversion (mp3 **to** wav, etc.) and the idea of bridging or connecting.
+
+![App Workflow (En)](img/app-workflow-en.jpg)
 
 ### Screenshot
 
