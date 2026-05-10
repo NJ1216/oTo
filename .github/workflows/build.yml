@@ -43,19 +43,12 @@ jobs:
       - name: Tauri ビルド
         run: npm run tauri -- build --no-bundle
 
-      # ── Windows: ポータブル exe をリネーム ────────
-      - name: ポータブル exe を準備
-        shell: pwsh
-        run: |
-          Move-Item "src-tauri/target/release/oto.exe" "src-tauri/target/release/_oTo_tmp.exe"
-          Rename-Item "src-tauri/target/release/_oTo_tmp.exe" "oTo.exe"
-
       # ── Windows: ポータブル exe を保存 ────────────
       - name: Artifact 保存
         uses: actions/upload-artifact@v4
         with:
           name: oTo-Windows
-          path: src-tauri/target/release/oTo.exe
+          path: src-tauri/target/release/oto.exe
           if-no-files-found: warn
 
 # ─────────────────────────────────────────────
@@ -85,7 +78,7 @@ jobs:
 
             | ファイル | 対象OS |
             |----------|--------|
-            | `oTo.exe` | Windows（インストール不要・単体実行ファイル） |
+            | `oto.exe` | Windows（インストール不要・単体実行ファイル） |
 
             **macOS** のバイナリは別途リリースページにアップロードされます。
           files: artifacts/**
