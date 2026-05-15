@@ -718,7 +718,8 @@ async fn convert_one(
 /// UNCパスまたはマップ済みネットワークドライブが入力に含まれるか判定する
 #[cfg(windows)]
 fn has_network_input(paths: &[String]) -> bool {
-    use windows_sys::Win32::Storage::FileSystem::{GetDriveTypeW, DRIVE_REMOTE};
+    use windows_sys::Win32::Storage::FileSystem::GetDriveTypeW;
+    const DRIVE_REMOTE: u32 = 4;
     for path in paths {
         if path.starts_with("\\\\") {
             return true;
