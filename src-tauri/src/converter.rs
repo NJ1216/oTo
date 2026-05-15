@@ -786,10 +786,13 @@ pub async fn run_conversion(
     let sem = Arc::new(Semaphore::new(settings.parallel_count.max(1)));
     let dialog_sem = Arc::new(Semaphore::new(1)); // ダイアログは同時1件
 
-    // フェーズ1: 全ファイルを並列 probe（完了まで待機）
+    // フェーズ1: 全ファイルを probe（probe 専用セマフォでネットワーク帯域を保護）
+    let probe_sem = Arc::new(Semaphore::new(settings.parallel_count.max(1)));
     let mut probe_set: JoinSet<(PathBuf, FileInfo)> = JoinSet::new();
     for path in file_paths {
+        let probe_sem = probe_sem.clone();
         probe_set.spawn(async move {
+            let _permit = probe_sem.acquire().await.unwrap();
             let info = probe_file(&path).await;
             (path, info)
         });
