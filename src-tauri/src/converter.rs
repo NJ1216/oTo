@@ -2,6 +2,8 @@ use anyhow::{anyhow, Result};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
+#[cfg(windows)]
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::process::Stdio;
 use std::sync::Arc;
 use tauri::{AppHandle, Emitter};
@@ -11,6 +13,9 @@ use tokio::task::JoinSet;
 use walkdir::WalkDir;
 
 use crate::settings::{NameConflict, OutputDest, Settings, SourceFileAction};
+
+#[cfg(windows)]
+static PROGRESS_FILE_COUNTER: AtomicU64 = AtomicU64::new(0);
 
 const MAX_FILE_SIZE: u64 = 10 * 1024 * 1024 * 1024; // 10 GiB
 
@@ -580,7 +585,8 @@ async fn convert_one(
     #[cfg(windows)]
     let progress_path = {
         let mut p = std::env::temp_dir();
-        p.push(format!("oto_p{}.txt", std::process::id()));
+        let id = PROGRESS_FILE_COUNTER.fetch_add(1, Ordering::Relaxed);
+        p.push(format!("oto_p{}.txt", id));
         args.push("-progress".into());
         args.push(p.to_string_lossy().into_owned());
         p
@@ -672,8 +678,8 @@ async fn convert_one(
                     break;
                 }
             }
-            // ffmpeg が異常終了した場合も確実に抜けられるよう stderr タスク終了を監視
-            if stderr_task.as_ref().map(|t| t.is_finished()).unwrap_or(false) {
+            // ffmpeg が終了した場合（正常・異常問わず）確実にループを抜ける
+            if child.try_wait().map(|opt| opt.is_some()).unwrap_or(false) {
                 break;
             }
         }
