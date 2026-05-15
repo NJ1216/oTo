@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use tauri::{AppHandle, Manager, State, WebviewUrl, WebviewWindowBuilder};
 use tokio::sync::Mutex;
@@ -12,6 +13,7 @@ use settings::Settings;
 pub struct JobInfo {
     pub handle: tokio::task::JoinHandle<()>,
     pub pgids: Arc<Mutex<Vec<i32>>>,
+    pub paused: AtomicBool,
 }
 
 pub struct AppState {
@@ -24,10 +26,10 @@ pub struct AppState {
 async fn convert_files(
     app: AppHandle,
     state: State<'_, AppState>,
+    job_id: String,
     request: ConvertRequest,
-) -> Result<String, String> {
+) -> Result<(), String> {
     let current_settings = settings::load_settings(&app).map_err(|e| e.to_string())?;
-    let job_id = uuid::Uuid::new_v4().to_string();
     let pgids: Arc<Mutex<Vec<i32>>> = Arc::new(Mutex::new(vec![]));
 
     let job_id_clone = job_id.clone();
@@ -41,8 +43,8 @@ async fn convert_files(
         app_for_cleanup.state::<AppState>().jobs.lock().await.remove(&job_id_for_cleanup);
     });
 
-    state.jobs.lock().await.insert(job_id.clone(), JobInfo { handle, pgids });
-    Ok(job_id)
+    state.jobs.lock().await.insert(job_id.clone(), JobInfo { handle, pgids, paused: AtomicBool::new(false) });
+    Ok(())
 }
 
 #[tauri::command]
@@ -50,8 +52,8 @@ async fn cancel_job(
     state: State<'_, AppState>,
     job_id: String,
 ) -> Result<(), String> {
-    let jobs = state.jobs.lock().await;
-    if let Some(job) = jobs.get(&job_id) {
+    let mut jobs = state.jobs.lock().await;
+    if let Some(job) = jobs.remove(&job_id) {
         job.handle.abort();
         #[cfg(unix)]
         {
@@ -86,6 +88,7 @@ async fn pause_job(
 ) -> Result<(), String> {
     let jobs = state.jobs.lock().await;
     if let Some(job) = jobs.get(&job_id) {
+        if job.paused.swap(true, Ordering::SeqCst) { return Ok(()); }
         #[cfg(unix)]
         {
             let pgids = job.pgids.lock().await;
@@ -106,6 +109,7 @@ async fn resume_job(
 ) -> Result<(), String> {
     let jobs = state.jobs.lock().await;
     if let Some(job) = jobs.get(&job_id) {
+        if !job.paused.swap(false, Ordering::SeqCst) { return Ok(()); }
         #[cfg(unix)]
         {
             let pgids = job.pgids.lock().await;

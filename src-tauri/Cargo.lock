@@ -2093,7 +2093,6 @@ dependencies = [
  "tauri-build",
  "tauri-plugin-dialog",
  "tokio",
- "uuid",
  "walkdir",
  "windows-sys 0.59.0",
 ]

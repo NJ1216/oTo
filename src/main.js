@@ -193,7 +193,10 @@ async function startConversion(paths) {
   setProgress(0);
 
   try {
-    activeJobId = await invoke('convert_files', {
+    const jobId = crypto.randomUUID();
+    activeJobId = jobId;
+    await invoke('convert_files', {
+      jobId,
       request: {
         paths,
         mode: currentMode,

@@ -1,4 +1,4 @@
-export const FORMAT_THEME = {
+const FORMAT_THEME = {
   mp3:  { color: '#FF9800', colorDark: '#4A2800', colorSecondary: '#E68900' },
   aac:  { color: '#2196F3', colorDark: '#0A2A4A', colorSecondary: '#1565C0' },
   wav:  { color: '#4CAF50', colorDark: '#1A3A1A', colorSecondary: '#388E3C' },
@@ -12,7 +12,6 @@ export const FORMAT_THEME = {
 const BASE_COLOR       = '#FF9800';
 const BASE_COLOR_SEC   = '#E68900';
 const BASE_COLOR_DARK  = '#4A2800';
-const BASE_FORMAT_TEXT = 'MP3';
 const BASE_MODE_ENCODE = 'ENCODE';
 const BASE_MODE_DECODE = 'DECODE';
 

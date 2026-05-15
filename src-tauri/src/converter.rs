@@ -613,6 +613,7 @@ async fn convert_one(
         });
     }
 
+    cmd.kill_on_drop(true);
     let mut child = cmd.spawn()
         .map_err(|e| anyhow!("failed to spawn ffmpeg: {}", e))?;
 
@@ -645,9 +646,7 @@ async fn convert_one(
         }
         // OPUS は pre-skip の影響で最終 out_time_us が duration を下回ることがある。
         // child.wait() の await yield を利用して受信側タスクに確実に 1.0 を届ける。
-        if duration_secs > 0.0 {
-            on_progress(1.0);
-        }
+        on_progress(1.0);
     }
 
     // Windows: 一時ファイルを 200ms 間隔でポーリングしてプログレスを更新
@@ -678,9 +677,7 @@ async fn convert_one(
                 break;
             }
         }
-        if duration_secs > 0.0 {
-            on_progress(1.0);
-        }
+        on_progress(1.0);
         let _ = tokio::fs::remove_file(&progress_path).await;
     }
 
