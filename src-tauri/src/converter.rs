@@ -715,6 +715,32 @@ async fn convert_one(
     Ok(())
 }
 
+/// UNCパスまたはマップ済みネットワークドライブが入力に含まれるか判定する
+#[cfg(windows)]
+fn has_network_input(paths: &[String]) -> bool {
+    use windows_sys::Win32::Storage::FileSystem::{GetDriveTypeW, DRIVE_REMOTE};
+    for path in paths {
+        if path.starts_with("\\\\") {
+            return true;
+        }
+        let mut chars = path.chars();
+        if let (Some(d), Some(':')) = (chars.next(), chars.next()) {
+            if d.is_ascii_alphabetic() {
+                let root: Vec<u16> = format!("{}:\\\0", d.to_ascii_uppercase())
+                    .encode_utf16()
+                    .collect();
+                if unsafe { GetDriveTypeW(root.as_ptr()) } == DRIVE_REMOTE {
+                    return true;
+                }
+            }
+        }
+    }
+    false
+}
+
+#[cfg(not(windows))]
+fn has_network_input(_paths: &[String]) -> bool { false }
+
 // --- Main conversion runner ---
 
 pub async fn run_conversion(
@@ -783,11 +809,13 @@ pub async fn run_conversion(
 
     let settings = Arc::new(settings);
     let job_id = Arc::new(job_id);
-    let sem = Arc::new(Semaphore::new(settings.parallel_count.max(1)));
+    // ネットワーク入力を検出した場合は並列数を1に制限して帯域飽和を防止
+    let effective_parallel = if has_network_input(&request.paths) { 1 } else { settings.parallel_count.max(1) };
+    let sem = Arc::new(Semaphore::new(effective_parallel));
     let dialog_sem = Arc::new(Semaphore::new(1)); // ダイアログは同時1件
 
     // フェーズ1: 全ファイルを probe（probe 専用セマフォでネットワーク帯域を保護）
-    let probe_sem = Arc::new(Semaphore::new(settings.parallel_count.max(1)));
+    let probe_sem = Arc::new(Semaphore::new(effective_parallel));
     let mut probe_set: JoinSet<(PathBuf, FileInfo)> = JoinSet::new();
     for path in file_paths {
         let probe_sem = probe_sem.clone();
