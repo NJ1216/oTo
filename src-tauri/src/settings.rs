@@ -53,11 +53,11 @@ fn default_flac_compression() -> u8 { 5 }
 fn default_last_mode() -> String    { "encode".into() }
 fn default_last_format() -> String  { "mp3".into() }
 
-fn calc_parallel_count(full_power: bool) -> usize {
+fn calc_parallel_count() -> usize {
     let cpu_count = std::thread::available_parallelism()
         .map(|n| n.get())
         .unwrap_or(4);
-    if full_power { cpu_count } else { (cpu_count - 1).max(1) }
+    (cpu_count - 1).max(1)
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -117,11 +117,9 @@ pub struct Settings {
     #[serde(default = "default_alac_bit_depth")]
     pub alac_bit_depth: u32,
 
-    /// full_power から動的計算される。settings.json には保存しない。
+    /// 起動時に動的計算される。settings.json には保存しない。
     #[serde(skip)]
     pub parallel_count: usize,
-    #[serde(default)]
-    pub full_power: bool,
     #[serde(default)]
     pub open_in_finder: bool,
     #[serde(default = "default_last_mode")]
@@ -165,8 +163,7 @@ impl Default for Settings {
             flac_compression: 5,
             alac_preset: String::new(),
             alac_bit_depth: default_alac_bit_depth(),
-            parallel_count: calc_parallel_count(false),
-            full_power: false,
+            parallel_count: calc_parallel_count(),
             open_in_finder: false,
             last_mode: "encode".into(),
             last_format: "mp3".into(),
@@ -195,7 +192,7 @@ pub fn load_settings(app: &AppHandle) -> Result<Settings> {
         eprintln!("Failed to parse settings.json: {e}");
         Settings::default()
     });
-    settings.parallel_count = calc_parallel_count(settings.full_power);
+    settings.parallel_count = calc_parallel_count();
     Ok(settings)
 }
 

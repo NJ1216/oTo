@@ -93,13 +93,6 @@ export default {
       vbr: 'VBR (Variable Bitrate)',
       vbrQuality: 'VBR Quality',
     },
-    parallel: {
-      title: 'Parallel Conversion',
-      fullPower: {
-        label: 'Full Power',
-        hint: 'OFF: CPU cores−1 (recommended)　ON: use all cores',
-      },
-    },
     formats: {
       title: 'Visible Formats',
       hint: 'Choose which formats appear in the main window (at least one required)',

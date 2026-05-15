@@ -519,6 +519,7 @@ async fn convert_one(
     settings: &Settings,
     info: &FileInfo,
     duration_secs: f64,
+    threads_per_job: usize,
     on_progress: impl Fn(f64) + Send,
     on_pid: impl Fn(u32) + Send,
 ) -> Result<()> {
@@ -537,8 +538,6 @@ async fn convert_one(
     let mut output_guard = OutputGuard { path: output.to_path_buf(), keep: false };
 
     let ffmpeg = ffmpeg_path();
-    let cpu_count = std::thread::available_parallelism().map(|n| n.get()).unwrap_or(4);
-    let threads_per_job = (cpu_count / settings.parallel_count.max(1)).max(1);
     let mut args: Vec<String> = vec![
         "-threads".into(), threads_per_job.to_string(),
         "-y".into(),
@@ -812,6 +811,9 @@ pub async fn run_conversion(
     let job_id = Arc::new(job_id);
     // ネットワーク入力を検出した場合は並列数を1に制限して帯域飽和を防止
     let effective_parallel = if has_network_input(&request.paths) { 1 } else { settings.parallel_count.max(1) };
+    // 並列数に応じてCPUスレッドを均等配分（1ジョブあたりのスレッド数）
+    let cpu_count = std::thread::available_parallelism().map(|n| n.get()).unwrap_or(4);
+    let threads_per_job = (cpu_count / effective_parallel).max(1);
     let sem = Arc::new(Semaphore::new(effective_parallel));
     let dialog_sem = Arc::new(Semaphore::new(1)); // ダイアログは同時1件
 
@@ -919,6 +921,7 @@ pub async fn run_conversion(
                 &settings,
                 &info,
                 file_duration,
+                threads_per_job,
                 move |ratio| { let _ = progress_tx.send(ratio); },
                 move |pid| {
                     let p = pgids_for_spawn.clone();

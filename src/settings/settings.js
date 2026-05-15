@@ -71,9 +71,6 @@ function populateForm(s) {
   setPreset('alacPreset', s.alacPreset || '');
   document.getElementById('alacBitDepth').value = String(s.alacBitDepth || 16);
 
-  // Full power toggle
-  document.getElementById('fullPower').checked = !!s.fullPower;
-
   // Enabled formats
   const enabled = s.enabledFormats || ['mp3', 'aac', 'flac'];
   document.querySelectorAll('.fmt-check').forEach((cb) => {
@@ -182,7 +179,6 @@ document.getElementById('save-btn').addEventListener('click', async () => {
     flacCompression: parseInt(document.getElementById('flacCompression').value, 10),
     alacPreset: document.getElementById('alacPreset').value,
     alacBitDepth: parseInt(document.getElementById('alacBitDepth').value, 10) || 16,
-    fullPower: document.getElementById('fullPower').checked,
     openInFinder: document.getElementById('openInFinder').checked,
     preserveFolderStructure: document.getElementById('preserveFolderStructure').checked,
     customOutputPath: customPath,
