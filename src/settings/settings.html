@@ -291,6 +291,45 @@
       </div>
     </section>
 
+    <!-- 無音トリミング -->
+    <section class="section">
+      <h2 data-i18n="settings.silenceTrim.title">無音トリミング</h2>
+      <div class="silence-trim-params">
+        <div class="silence-param-row">
+          <label data-i18n="settings.silenceTrim.db">検出レベル</label>
+          <div class="silence-input-wrap">
+            <input type="number" id="silenceTrimDb" min="-100" max="-1" step="1" value="-80" />
+            <span class="silence-unit">dB</span>
+          </div>
+        </div>
+        <div class="silence-param-row">
+          <label data-i18n="settings.silenceTrim.duration">最短無音時間</label>
+          <div class="silence-input-wrap">
+            <input type="number" id="silenceTrimDurationMs" min="10" max="2000" step="10" value="50" />
+            <span class="silence-unit">ms</span>
+          </div>
+        </div>
+        <button id="open-preview-btn" class="small-btn" data-i18n="settings.silenceTrim.preview">波形プレビュー</button>
+      </div>
+      <details class="silence-group">
+        <summary data-i18n="settings.silenceTrim.encode">エンコード（変換先）</summary>
+        <div class="format-check-group silence-fmt-group">
+          <label class="checkbox-row"><input type="checkbox" class="silence-trim-check" data-fmt="mp3" /> <span>MP3</span></label>
+          <label class="checkbox-row"><input type="checkbox" class="silence-trim-check" data-fmt="aac" /> <span>AAC</span></label>
+          <label class="checkbox-row"><input type="checkbox" class="silence-trim-check" data-fmt="opus" /> <span>OPUS</span></label>
+        </div>
+      </details>
+      <details class="silence-group">
+        <summary data-i18n="settings.silenceTrim.decode">デコード（変換先）</summary>
+        <div class="format-check-group silence-fmt-group">
+          <label class="checkbox-row"><input type="checkbox" class="silence-trim-check" data-fmt="flac" /> <span>FLAC</span></label>
+          <label class="checkbox-row"><input type="checkbox" class="silence-trim-check" data-fmt="alac" /> <span>ALAC</span></label>
+          <label class="checkbox-row"><input type="checkbox" class="silence-trim-check" data-fmt="wav" /> <span>WAV</span></label>
+          <label class="checkbox-row"><input type="checkbox" class="silence-trim-check" data-fmt="aiff" /> <span>AIFF</span></label>
+        </div>
+      </details>
+    </section>
+
     <!-- 対応フォーマット -->
     <section class="section">
       <h2 data-i18n="settings.formats.title">表示フォーマット</h2>

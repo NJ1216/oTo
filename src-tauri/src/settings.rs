@@ -52,6 +52,8 @@ fn default_opus_mode() -> String    { "vbr".into() }
 fn default_flac_compression() -> u8 { 5 }
 fn default_last_mode() -> String    { "encode".into() }
 fn default_last_format() -> String  { "mp3".into() }
+fn default_silence_trim_db() -> f64 { -80.0 }
+fn default_silence_trim_duration_ms() -> u32 { 50 }
 
 fn calc_parallel_count() -> usize {
     let cpu_count = std::thread::available_parallelism()
@@ -135,6 +137,19 @@ pub struct Settings {
     pub language: String,
     #[serde(default = "default_enabled_formats")]
     pub enabled_formats: Vec<String>,
+
+    // Silence trim
+    #[serde(default = "default_silence_trim_db")]
+    pub silence_trim_db: f64,
+    #[serde(default = "default_silence_trim_duration_ms")]
+    pub silence_trim_duration_ms: u32,
+    #[serde(default)] pub silence_trim_mp3:  bool,
+    #[serde(default)] pub silence_trim_aac:  bool,
+    #[serde(default)] pub silence_trim_opus: bool,
+    #[serde(default)] pub silence_trim_flac: bool,
+    #[serde(default)] pub silence_trim_alac: bool,
+    #[serde(default)] pub silence_trim_wav:  bool,
+    #[serde(default)] pub silence_trim_aiff: bool,
 }
 
 impl Default for Settings {
@@ -172,6 +187,15 @@ impl Default for Settings {
             preserve_folder_structure: false,
             language: String::new(),
             enabled_formats: default_enabled_formats(),
+            silence_trim_db: default_silence_trim_db(),
+            silence_trim_duration_ms: default_silence_trim_duration_ms(),
+            silence_trim_mp3: false,
+            silence_trim_aac: false,
+            silence_trim_opus: false,
+            silence_trim_flac: false,
+            silence_trim_alac: false,
+            silence_trim_wav: false,
+            silence_trim_aiff: false,
         }
     }
 }

@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Waveform Preview</title>
+  <link rel="stylesheet" href="preview.css" />
+</head>
+<body>
+  <div id="app">
+    <div id="drop-zone" class="drop-zone" id="drop-zone">
+      <p id="drop-hint" class="drop-hint">音声ファイルをここにドロップ</p>
+      <div id="file-info" class="file-info hidden">
+        <span id="file-name" class="file-name"></span>
+        <span id="file-duration" class="file-duration"></span>
+      </div>
+    </div>
+
+    <div id="waveform-wrap" class="waveform-wrap">
+      <canvas id="waveform" class="waveform"></canvas>
+      <div id="waveform-overlay" class="waveform-overlay hidden"></div>
+      <div id="waveform-empty" class="waveform-empty">
+        ファイルをドロップすると波形が表示されます
+      </div>
+    </div>
+
+    <div id="controls" class="controls">
+      <div class="ctrl-row">
+        <label>検出レベル</label>
+        <input type="number" id="previewDb" min="-100" max="-1" step="1" value="-80" />
+        <span class="unit">dB</span>
+        <label>最短無音時間</label>
+        <input type="number" id="previewDurationMs" min="10" max="2000" step="10" value="50" />
+        <span class="unit">ms</span>
+        <button id="analyze-btn" class="btn-analyze">解析</button>
+        <span id="analyze-status" class="analyze-status"></span>
+      </div>
+      <div class="legend-row">
+        <span class="legend-swatch silence-swatch"></span>
+        <span class="legend-label">除去される無音領域</span>
+        <span class="legend-swatch keep-swatch"></span>
+        <span class="legend-label">保持される音声</span>
+      </div>
+    </div>
+  </div>
+  <script type="module" src="preview.js"></script>
+</body>
+</html>

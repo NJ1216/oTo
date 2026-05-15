@@ -80,6 +80,15 @@ function populateForm(s) {
   // Open in Finder
   document.getElementById('openInFinder').checked = s.openInFinder;
 
+  // Silence trim
+  document.getElementById('silenceTrimDb').value = String(s.silenceTrimDb ?? -80);
+  document.getElementById('silenceTrimDurationMs').value = String(s.silenceTrimDurationMs ?? 50);
+  ['mp3', 'aac', 'opus', 'flac', 'alac', 'wav', 'aiff'].forEach((fmt) => {
+    const key = 'silenceTrim' + fmt.charAt(0).toUpperCase() + fmt.slice(1);
+    const cb = document.querySelector(`.silence-trim-check[data-fmt="${fmt}"]`);
+    if (cb) cb.checked = !!s[key];
+  });
+
   // Language
   document.getElementById('language').value = s.language || '';
 }
@@ -143,6 +152,11 @@ document.getElementById('pick-folder-btn').addEventListener('click', async () =>
   }
 });
 
+// Open waveform preview window
+document.getElementById('open-preview-btn').addEventListener('click', async () => {
+  await invoke('open_silence_preview');
+});
+
 // Language real-time preview
 document.getElementById('language').addEventListener('change', (e) => {
   initI18n(e.target.value);
@@ -179,6 +193,13 @@ document.getElementById('save-btn').addEventListener('click', async () => {
     flacCompression: parseInt(document.getElementById('flacCompression').value, 10),
     alacPreset: document.getElementById('alacPreset').value,
     alacBitDepth: parseInt(document.getElementById('alacBitDepth').value, 10) || 16,
+    silenceTrimDb: parseFloat(document.getElementById('silenceTrimDb').value) || -80,
+    silenceTrimDurationMs: parseInt(document.getElementById('silenceTrimDurationMs').value, 10) || 50,
+    ...['mp3', 'aac', 'opus', 'flac', 'alac', 'wav', 'aiff'].reduce((acc, fmt) => {
+      const key = 'silenceTrim' + fmt.charAt(0).toUpperCase() + fmt.slice(1);
+      acc[key] = document.querySelector(`.silence-trim-check[data-fmt="${fmt}"]`)?.checked || false;
+      return acc;
+    }, {}),
     openInFinder: document.getElementById('openInFinder').checked,
     preserveFolderStructure: document.getElementById('preserveFolderStructure').checked,
     customOutputPath: customPath,

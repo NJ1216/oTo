@@ -350,3 +350,82 @@ input[type="checkbox"] {
   font-size: 11px;
   color: rgba(255, 255, 255, 0.35);
 }
+
+/* Silence trim section */
+.silence-trim-params {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  margin-bottom: 7px;
+}
+
+.silence-param-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.silence-param-row label {
+  flex: 1;
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.silence-input-wrap {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.silence-input-wrap input[type="number"] {
+  width: 64px;
+  background: #262637;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 4px;
+  color: rgba(255, 255, 255, 0.85);
+  font-size: 12px;
+  padding: 4px 6px;
+  text-align: center;
+}
+
+.silence-unit {
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.4);
+  min-width: 18px;
+}
+
+.silence-group {
+  margin-top: 4px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 4px;
+  padding: 0 8px;
+}
+
+.silence-group summary {
+  cursor: pointer;
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.55);
+  padding: 5px 0;
+  user-select: none;
+  list-style: none;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.silence-group summary::-webkit-details-marker { display: none; }
+
+.silence-group summary::before {
+  content: '▶';
+  font-size: 8px;
+  opacity: 0.6;
+  transition: transform 0.15s;
+  display: inline-block;
+}
+
+.silence-group[open] summary::before {
+  transform: rotate(90deg);
+}
+
+.silence-fmt-group {
+  padding: 4px 0 6px 12px;
+}

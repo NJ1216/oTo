@@ -100,7 +100,7 @@ fn resolve_binary(name: &str) -> String {
     name.to_string()
 }
 
-fn ffmpeg_path() -> String { resolve_binary("ffmpeg") }
+pub fn ffmpeg_path() -> String { resolve_binary("ffmpeg") }
 fn ffprobe_path() -> String { resolve_binary("ffprobe") }
 
 // --- File collection ---
@@ -570,6 +570,29 @@ async fn convert_one(
     for (k, v) in &info.tags {
         args.push("-metadata".into());
         args.push(format!("{}={}", k, v));
+    }
+
+    // Silence trim (-af silenceremove)
+    let trim_enabled = match format {
+        "mp3"  => settings.silence_trim_mp3,
+        "aac"  => settings.silence_trim_aac,
+        "opus" => settings.silence_trim_opus,
+        "flac" => settings.silence_trim_flac,
+        "alac" => settings.silence_trim_alac,
+        "wav"  => settings.silence_trim_wav,
+        "aiff" => settings.silence_trim_aiff,
+        _ => false,
+    };
+    if trim_enabled {
+        let dur = settings.silence_trim_duration_ms as f64 / 1000.0;
+        let db  = settings.silence_trim_db;
+        args.extend([
+            "-af".into(),
+            format!(
+                "silenceremove=start_periods=1:start_silence={dur:.4}:start_threshold={db}dB\
+                 :stop_periods=-1:stop_silence={dur:.4}:stop_threshold={db}dB"
+            ),
+        ]);
     }
 
     args.extend(build_codec_args(format, settings, info));
