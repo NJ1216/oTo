@@ -573,16 +573,7 @@ async fn convert_one(
     }
 
     // Silence trim (-af silenceremove)
-    let trim_enabled = match format {
-        "mp3"  => settings.silence_trim_mp3,
-        "aac"  => settings.silence_trim_aac,
-        "opus" => settings.silence_trim_opus,
-        "flac" => settings.silence_trim_flac,
-        "alac" => settings.silence_trim_alac,
-        "wav"  => settings.silence_trim_wav,
-        "aiff" => settings.silence_trim_aiff,
-        _ => false,
-    };
+    let trim_enabled = settings.silence_trim_enabled;
     if trim_enabled {
         let dur = settings.silence_trim_duration_ms as f64 / 1000.0;
         let db  = settings.silence_trim_db;

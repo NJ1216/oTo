@@ -253,7 +253,7 @@ async fn open_silence_preview(app: AppHandle) -> Result<(), String> {
         win.set_focus().map_err(|e| e.to_string())?;
     } else {
         WebviewWindowBuilder::new(&app, "silence-preview", WebviewUrl::App("silence-preview/preview.html".into()))
-            .title("oTo - Waveform Preview")
+            .title("無音トリミング - 詳細設定")
             .inner_size(820.0, 560.0)
             .resizable(true)
             .build()

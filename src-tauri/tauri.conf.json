@@ -17,6 +17,16 @@
         "resizable": false,
         "center": true,
         "dragDropEnabled": true
+      },
+      {
+        "label": "silence-preview",
+        "url": "silence-preview/preview.html",
+        "title": "無音トリミング - 詳細設定",
+        "width": 820,
+        "height": 560,
+        "resizable": true,
+        "visible": false,
+        "dragDropEnabled": true
       }
     ],
     "security": {

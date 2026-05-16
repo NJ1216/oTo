@@ -79,7 +79,7 @@ async function init() {
   await listen('settings_updated', async () => {
     appSettings = await invoke('get_settings');
     await initI18n(appSettings.language || '');
-    applyFormatToUI();
+    applyModeToUI();
   });
 }
 
@@ -100,9 +100,17 @@ function applyModeToUI() {
 }
 
 function applyDecodeFormatToUI() {
+  const enabledDecode = appSettings?.enabledDecodeFormats || ['wav', 'aiff'];
   document.querySelectorAll('.decode-fmt-btn').forEach((btn) => {
+    btn.style.display = enabledDecode.includes(btn.dataset.fmt) ? '' : 'none';
     btn.classList.toggle('active', btn.dataset.fmt === currentDecodeFormat);
   });
+  if (!enabledDecode.includes(currentDecodeFormat)) {
+    currentDecodeFormat = enabledDecode[0] || 'wav';
+    document.querySelectorAll('.decode-fmt-btn').forEach((btn) => {
+      btn.classList.toggle('active', btn.dataset.fmt === currentDecodeFormat);
+    });
+  }
   setFormat(currentDecodeFormat);
 }
 

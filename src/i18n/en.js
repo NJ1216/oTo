@@ -95,6 +95,8 @@ export default {
     },
     formats: {
       title: 'Visible Formats',
+      encode: 'Encode',
+      decode: 'Decode',
       hint: 'Choose which formats appear in the main window (at least one required)',
     },
     misc: {
@@ -109,11 +111,18 @@ export default {
     },
     silenceTrim: {
       title: 'Silence Trim',
+      enable: 'Enable silence trimming',
+      detail: 'Advanced…',
       db: 'Detection Level',
       duration: 'Min Duration',
-      encode: 'Encode Targets',
-      decode: 'Decode Targets',
-      preview: 'Waveform Preview',
+    },
+    silencePreview: {
+      title: 'Silence Trim - Advanced',
+      drop: 'Drop an audio file here',
+      empty: 'Drop a file to view the waveform',
+      zoomHint: 'g/h: Zoom H　Shift+g/h: Zoom V　Click: Reset',
+      silenceLabel: 'Silence to remove',
+      keepLabel: 'Audio to keep',
     },
     cancel: 'Cancel',
     save: 'Save',

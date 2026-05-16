@@ -10,41 +10,43 @@
   <div id="app">
     <h1 data-i18n="settings.title">設定</h1>
 
-    <!-- 出力先 -->
+    <!-- 出力・ソース・競合 -->
     <section class="section">
-      <h2 data-i18n="settings.output.title">出力先フォルダ</h2>
-      <div class="radio-group">
-        <label><input type="radio" name="outputDest" value="source_folder" /> <span data-i18n="settings.output.source">元ファイルと同じフォルダ</span></label>
-        <label><input type="radio" name="outputDest" value="desktop" /> <span data-i18n="settings.output.desktop">デスクトップ</span></label>
-        <label><input type="radio" name="outputDest" value="downloads" /> <span data-i18n="settings.output.downloads">ダウンロード</span></label>
-        <label class="custom-row">
-          <input type="radio" name="outputDest" value="custom" /> <span data-i18n="settings.output.custom">指定フォルダ</span>
+      <div class="setting-grid">
+        <label data-i18n="settings.output.title">出力先フォルダ</label>
+        <div class="select-wrap">
+          <select id="outputDest">
+            <option value="source_folder" data-i18n="settings.output.source">元ファイルと同じフォルダ</option>
+            <option value="desktop" data-i18n="settings.output.desktop">デスクトップ</option>
+            <option value="downloads" data-i18n="settings.output.downloads">ダウンロード</option>
+            <option value="custom" data-i18n="settings.output.custom">指定フォルダ</option>
+          </select>
+        </div>
+        <div id="custom-path-row" class="full-row custom-path-row hidden">
+          <div id="custom-path-display" class="path-display"></div>
           <button id="pick-folder-btn" class="small-btn" data-i18n="settings.output.pick">選択…</button>
-        </label>
-      </div>
-      <div id="custom-path-display" class="path-display"></div>
-      <label id="preserve-structure-row" class="checkbox-row" style="display:none">
-        <input type="checkbox" id="preserveFolderStructure" />
-        <span data-i18n="settings.output.preserveStructure">フォルダ構造を維持する</span>
-      </label>
-    </section>
+        </div>
+        <label id="preserve-structure-label" class="hidden" data-i18n="settings.output.preserveStructure">フォルダ構造を維持する</label>
+        <div id="preserve-structure-check" class="hidden">
+          <input type="checkbox" id="preserveFolderStructure" />
+        </div>
 
-    <!-- 元ファイルの扱い -->
-    <section class="section">
-      <h2 data-i18n="settings.source.title">元ファイルの扱い</h2>
-      <div class="radio-group">
-        <label><input type="radio" name="sourceAction" value="keep" /> <span data-i18n="settings.source.keep">保持（デフォルト）</span></label>
-        <label><input type="radio" name="sourceAction" value="delete" /> <span data-i18n="settings.source.delete">変換後に削除</span></label>
-      </div>
-    </section>
+        <label data-i18n="settings.source.title">元ファイルの扱い</label>
+        <div class="select-wrap">
+          <select id="sourceAction">
+            <option value="keep" data-i18n="settings.source.keep">保持（デフォルト）</option>
+            <option value="delete" data-i18n="settings.source.delete">変換後に削除</option>
+          </select>
+        </div>
 
-    <!-- 同名ファイル競合 -->
-    <section class="section">
-      <h2 data-i18n="settings.conflict.title">同名ファイルの競合処理</h2>
-      <div class="radio-group">
-        <label><input type="radio" name="nameConflict" value="auto_rename" /> <span data-i18n="settings.conflict.rename">自動リネーム（デフォルト）</span></label>
-        <label><input type="radio" name="nameConflict" value="confirm_dialog" /> <span data-i18n="settings.conflict.confirm">上書き確認</span></label>
-        <label><input type="radio" name="nameConflict" value="force_overwrite" /> <span data-i18n="settings.conflict.overwrite">強制上書き</span></label>
+        <label data-i18n="settings.conflict.title">競合処理</label>
+        <div class="select-wrap">
+          <select id="nameConflict">
+            <option value="auto_rename" data-i18n="settings.conflict.rename">自動リネーム（デフォルト）</option>
+            <option value="confirm_dialog" data-i18n="settings.conflict.confirm">上書き確認</option>
+            <option value="force_overwrite" data-i18n="settings.conflict.overwrite">強制上書き</option>
+          </select>
+        </div>
       </div>
     </section>
 
@@ -294,51 +296,35 @@
     <!-- 無音トリミング -->
     <section class="section">
       <h2 data-i18n="settings.silenceTrim.title">無音トリミング</h2>
-      <div class="silence-trim-params">
-        <div class="silence-param-row">
-          <label data-i18n="settings.silenceTrim.db">検出レベル</label>
-          <div class="silence-input-wrap">
-            <input type="number" id="silenceTrimDb" min="-100" max="-1" step="1" value="-80" />
-            <span class="silence-unit">dB</span>
+      <div class="silence-main-row">
+        <label class="checkbox-row toggle-row">
+          <div class="toggle-label-text">
+            <span data-i18n="settings.silenceTrim.enable">無音トリミングを有効にする</span>
           </div>
-        </div>
-        <div class="silence-param-row">
-          <label data-i18n="settings.silenceTrim.duration">最短無音時間</label>
-          <div class="silence-input-wrap">
-            <input type="number" id="silenceTrimDurationMs" min="10" max="2000" step="10" value="50" />
-            <span class="silence-unit">ms</span>
+          <div class="toggle-switch-wrap">
+            <input type="checkbox" id="silenceTrimEnabled" />
+            <span class="toggle-pill"></span>
           </div>
-        </div>
-        <button id="open-preview-btn" class="small-btn" data-i18n="settings.silenceTrim.preview">波形プレビュー</button>
+        </label>
+        <button id="open-preview-btn" class="small-btn" data-i18n="settings.silenceTrim.detail">詳細設定…</button>
       </div>
-      <details class="silence-group">
-        <summary data-i18n="settings.silenceTrim.encode">エンコード（変換先）</summary>
-        <div class="format-check-group silence-fmt-group">
-          <label class="checkbox-row"><input type="checkbox" class="silence-trim-check" data-fmt="mp3" /> <span>MP3</span></label>
-          <label class="checkbox-row"><input type="checkbox" class="silence-trim-check" data-fmt="aac" /> <span>AAC</span></label>
-          <label class="checkbox-row"><input type="checkbox" class="silence-trim-check" data-fmt="opus" /> <span>OPUS</span></label>
-        </div>
-      </details>
-      <details class="silence-group">
-        <summary data-i18n="settings.silenceTrim.decode">デコード（変換先）</summary>
-        <div class="format-check-group silence-fmt-group">
-          <label class="checkbox-row"><input type="checkbox" class="silence-trim-check" data-fmt="flac" /> <span>FLAC</span></label>
-          <label class="checkbox-row"><input type="checkbox" class="silence-trim-check" data-fmt="alac" /> <span>ALAC</span></label>
-          <label class="checkbox-row"><input type="checkbox" class="silence-trim-check" data-fmt="wav" /> <span>WAV</span></label>
-          <label class="checkbox-row"><input type="checkbox" class="silence-trim-check" data-fmt="aiff" /> <span>AIFF</span></label>
-        </div>
-      </details>
     </section>
 
-    <!-- 対応フォーマット -->
+    <!-- 表示フォーマット -->
     <section class="section">
       <h2 data-i18n="settings.formats.title">表示フォーマット</h2>
-      <div class="format-check-group">
-        <label class="checkbox-row"><input type="checkbox" class="fmt-check" data-fmt="mp3" /> <span>MP3</span></label>
-        <label class="checkbox-row"><input type="checkbox" class="fmt-check" data-fmt="aac" /> <span>AAC</span></label>
-        <label class="checkbox-row"><input type="checkbox" class="fmt-check" data-fmt="opus" /> <span>OPUS</span></label>
-        <label class="checkbox-row"><input type="checkbox" class="fmt-check" data-fmt="flac" /> <span>FLAC</span></label>
-        <label class="checkbox-row"><input type="checkbox" class="fmt-check" data-fmt="alac" /> <span>ALAC</span></label>
+      <p class="format-sub-label" data-i18n="settings.formats.encode">エンコード</p>
+      <div class="format-btn-group" id="encode-fmt-group">
+        <button class="fmt-toggle-btn" data-fmt="mp3">MP3</button>
+        <button class="fmt-toggle-btn" data-fmt="aac">AAC</button>
+        <button class="fmt-toggle-btn" data-fmt="opus">OPUS</button>
+        <button class="fmt-toggle-btn" data-fmt="flac">FLAC</button>
+        <button class="fmt-toggle-btn" data-fmt="alac">ALAC</button>
+      </div>
+      <p class="format-sub-label" data-i18n="settings.formats.decode">デコード</p>
+      <div class="format-btn-group" id="decode-fmt-group">
+        <button class="fmt-toggle-btn decode-toggle-btn" data-fmt="wav">WAV</button>
+        <button class="fmt-toggle-btn decode-toggle-btn" data-fmt="aiff">AIFF</button>
       </div>
       <p class="format-hint" data-i18n="settings.formats.hint">メインウィンドウに表示する変換形式を選択（最低1つ必要）</p>
     </section>

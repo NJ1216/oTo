@@ -133,24 +133,20 @@ body {
   color: rgba(255, 255, 255, 0.35);
 }
 
-.btn-analyze {
-  background: rgba(99, 102, 241, 0.75);
-  border: 1px solid rgba(99, 102, 241, 0.4);
-  border-radius: 4px;
-  color: #fff;
-  font-size: 12px;
-  padding: 4px 12px;
-  cursor: pointer;
-  transition: background 0.15s;
-  margin-left: 4px;
-}
-
-.btn-analyze:hover { background: rgba(99, 102, 241, 1); }
-.btn-analyze:disabled { opacity: 0.4; cursor: default; }
-
 .analyze-status {
   font-size: 11px;
   color: rgba(255, 255, 255, 0.4);
+  flex: 1;
+}
+
+.zoom-hint-row {
+  padding-top: 0;
+}
+
+.zoom-hint {
+  font-size: 10px;
+  color: rgba(255, 255, 255, 0.25);
+  letter-spacing: 0.02em;
 }
 
 .legend-row {
@@ -174,3 +170,16 @@ body {
   color: rgba(255, 255, 255, 0.4);
   margin-right: 8px;
 }
+
+/* Selection overlay on waveform */
+.selection-overlay {
+  position: absolute;
+  top: 0;
+  height: 100%;
+  background: rgba(255, 255, 255, 0.12);
+  border-left: 1px solid rgba(255, 255, 255, 0.4);
+  border-right: 1px solid rgba(255, 255, 255, 0.4);
+  pointer-events: none;
+  display: none;
+}
+

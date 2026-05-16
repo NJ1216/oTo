@@ -95,6 +95,8 @@ export default {
     },
     formats: {
       title: '表示フォーマット',
+      encode: 'エンコード',
+      decode: 'デコード',
       hint: 'メインウィンドウに表示する変換形式（最低1つ必要）',
     },
     misc: {
@@ -109,11 +111,18 @@ export default {
     },
     silenceTrim: {
       title: '無音トリミング',
+      enable: '無音トリミングを有効にする',
+      detail: '詳細設定…',
       db: '検出レベル',
       duration: '最短無音時間',
-      encode: 'エンコード（変換先）',
-      decode: 'デコード（変換先）',
-      preview: '波形プレビュー',
+    },
+    silencePreview: {
+      title: '無音トリミング - 詳細設定',
+      drop: '音声ファイルをここにドロップ',
+      empty: 'ファイルをドロップすると波形が表示されます',
+      zoomHint: 'g/h: 横ズーム　Shift+g/h: 縦ズーム　クリック: リセット',
+      silenceLabel: '除去される無音領域',
+      keepLabel: '保持される音声',
     },
     cancel: 'キャンセル',
     save: '保存',

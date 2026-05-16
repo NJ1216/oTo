@@ -31,6 +31,10 @@ fn default_enabled_formats() -> Vec<String> {
     vec!["mp3".into(), "aac".into(), "flac".into()]
 }
 
+fn default_enabled_decode_formats() -> Vec<String> {
+    vec!["wav".into(), "aiff".into()]
+}
+
 fn default_mp3_channel_mode() -> String { "joint_stereo".into() }
 fn default_last_decode_format() -> String { "wav".into() }
 
@@ -138,18 +142,14 @@ pub struct Settings {
     #[serde(default = "default_enabled_formats")]
     pub enabled_formats: Vec<String>,
 
+    #[serde(default = "default_enabled_decode_formats")]
+    pub enabled_decode_formats: Vec<String>,
     // Silence trim
+    #[serde(default)] pub silence_trim_enabled: bool,
     #[serde(default = "default_silence_trim_db")]
     pub silence_trim_db: f64,
     #[serde(default = "default_silence_trim_duration_ms")]
     pub silence_trim_duration_ms: u32,
-    #[serde(default)] pub silence_trim_mp3:  bool,
-    #[serde(default)] pub silence_trim_aac:  bool,
-    #[serde(default)] pub silence_trim_opus: bool,
-    #[serde(default)] pub silence_trim_flac: bool,
-    #[serde(default)] pub silence_trim_alac: bool,
-    #[serde(default)] pub silence_trim_wav:  bool,
-    #[serde(default)] pub silence_trim_aiff: bool,
 }
 
 impl Default for Settings {
@@ -187,15 +187,10 @@ impl Default for Settings {
             preserve_folder_structure: false,
             language: String::new(),
             enabled_formats: default_enabled_formats(),
+            enabled_decode_formats: default_enabled_decode_formats(),
+            silence_trim_enabled: false,
             silence_trim_db: default_silence_trim_db(),
             silence_trim_duration_ms: default_silence_trim_duration_ms(),
-            silence_trim_mp3: false,
-            silence_trim_aac: false,
-            silence_trim_opus: false,
-            silence_trim_flac: false,
-            silence_trim_alac: false,
-            silence_trim_wav: false,
-            silence_trim_aiff: false,
         }
     }
 }

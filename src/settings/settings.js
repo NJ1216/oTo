@@ -15,30 +15,37 @@ async function init() {
   populateForm(settings);
 }
 
-function updatePreserveVisibility() {
-  const dest = document.querySelector('input[name="outputDest"]:checked')?.value;
-  const row = document.getElementById('preserve-structure-row');
-  if (row) row.style.display = dest === 'source_folder' ? 'none' : '';
+function updateCustomPathRow() {
+  const dest = document.getElementById('outputDest').value;
+  document.getElementById('custom-path-row')?.classList.toggle('hidden', dest !== 'custom');
+  const showPreserve = dest !== 'source_folder';
+  document.getElementById('preserve-structure-label')?.classList.toggle('hidden', !showPreserve);
+  document.getElementById('preserve-structure-check')?.classList.toggle('hidden', !showPreserve);
+}
+
+function updateCustomPathDisplay() {
+  const el = document.getElementById('custom-path-display');
+  el.textContent = customPath || '';
 }
 
 function populateForm(s) {
   // Output destination
-  const destVal = snakeCase(s.outputDest);
-  const destRadio = document.querySelector(`input[name="outputDest"][value="${destVal}"]`);
-  if (destRadio) destRadio.checked = true;
+  document.getElementById('outputDest').value = snakeCase(s.outputDest) || 'source_folder';
   updateCustomPathDisplay();
+  updateCustomPathRow();
   document.getElementById('preserveFolderStructure').checked = !!s.preserveFolderStructure;
-  updatePreserveVisibility();
+
+  // Decode formats
+  const enabledDecode = s.enabledDecodeFormats || ['wav', 'aiff'];
+  document.querySelectorAll('.decode-toggle-btn').forEach((btn) => {
+    btn.classList.toggle('active', enabledDecode.includes(btn.dataset.fmt));
+  });
 
   // Source file action
-  const actionVal = snakeCase(s.sourceFileAction);
-  const actionRadio = document.querySelector(`input[name="sourceAction"][value="${actionVal}"]`);
-  if (actionRadio) actionRadio.checked = true;
+  document.getElementById('sourceAction').value = snakeCase(s.sourceFileAction) || 'keep';
 
   // Name conflict
-  const conflictVal = snakeCase(s.nameConflict);
-  const conflictRadio = document.querySelector(`input[name="nameConflict"][value="${conflictVal}"]`);
-  if (conflictRadio) conflictRadio.checked = true;
+  document.getElementById('nameConflict').value = snakeCase(s.nameConflict) || 'auto_rename';
 
   // Quality presets
   setPreset('mp3Preset', s.mp3Preset || '192');
@@ -71,23 +78,17 @@ function populateForm(s) {
   setPreset('alacPreset', s.alacPreset || '');
   document.getElementById('alacBitDepth').value = String(s.alacBitDepth || 16);
 
-  // Enabled formats
+  // Silence trim
+  document.getElementById('silenceTrimEnabled').checked = !!s.silenceTrimEnabled;
+
+  // Enabled formats (button UI) — encode group only; decode group handled above
   const enabled = s.enabledFormats || ['mp3', 'aac', 'flac'];
-  document.querySelectorAll('.fmt-check').forEach((cb) => {
-    cb.checked = enabled.includes(cb.dataset.fmt);
+  document.querySelectorAll('#encode-fmt-group .fmt-toggle-btn').forEach((btn) => {
+    btn.classList.toggle('active', enabled.includes(btn.dataset.fmt));
   });
 
   // Open in Finder
   document.getElementById('openInFinder').checked = s.openInFinder;
-
-  // Silence trim
-  document.getElementById('silenceTrimDb').value = String(s.silenceTrimDb ?? -80);
-  document.getElementById('silenceTrimDurationMs').value = String(s.silenceTrimDurationMs ?? 50);
-  ['mp3', 'aac', 'opus', 'flac', 'alac', 'wav', 'aiff'].forEach((fmt) => {
-    const key = 'silenceTrim' + fmt.charAt(0).toUpperCase() + fmt.slice(1);
-    const cb = document.querySelector(`.silence-trim-check[data-fmt="${fmt}"]`);
-    if (cb) cb.checked = !!s[key];
-  });
 
   // Language
   document.getElementById('language').value = s.language || '';
@@ -120,10 +121,8 @@ function toggleCustomDetail(selectId, show) {
   });
 });
 
-// Output dest radios — show/hide preserve structure option
-document.querySelectorAll('input[name="outputDest"]').forEach((r) => {
-  r.addEventListener('change', updatePreserveVisibility);
-});
+// Output dest select
+document.getElementById('outputDest').addEventListener('change', updateCustomPathRow);
 
 // CBR/VBR mode radios
 ['mp3', 'aac'].forEach((fmt) => {
@@ -132,13 +131,27 @@ document.querySelectorAll('input[name="outputDest"]').forEach((r) => {
   });
 });
 
-function snakeCase(val) {
-  return val.replace(/([A-Z])/g, (m) => '_' + m.toLowerCase());
-}
+// Encode format toggle buttons (min 1)
+document.querySelectorAll('#encode-fmt-group .fmt-toggle-btn').forEach((btn) => {
+  btn.addEventListener('click', () => {
+    const activeCount = document.querySelectorAll('#encode-fmt-group .fmt-toggle-btn.active').length;
+    if (btn.classList.contains('active') && activeCount <= 1) return;
+    btn.classList.toggle('active');
+  });
+});
 
-function updateCustomPathDisplay() {
-  const el = document.getElementById('custom-path-display');
-  el.textContent = customPath || '';
+// Decode format toggle buttons (min 1)
+document.querySelectorAll('.decode-toggle-btn').forEach((btn) => {
+  btn.addEventListener('click', () => {
+    const activeCount = document.querySelectorAll('.decode-toggle-btn.active').length;
+    if (btn.classList.contains('active') && activeCount <= 1) return;
+    btn.classList.toggle('active');
+  });
+});
+
+function snakeCase(val) {
+  if (!val) return val;
+  return val.replace(/([A-Z])/g, (m) => '_' + m.toLowerCase());
 }
 
 // Folder picker
@@ -147,12 +160,12 @@ document.getElementById('pick-folder-btn').addEventListener('click', async () =>
   if (path) {
     customPath = path;
     updateCustomPathDisplay();
-    const radio = document.querySelector('input[name="outputDest"][value="custom"]');
-    if (radio) radio.checked = true;
+    document.getElementById('outputDest').value = 'custom';
+    updateCustomPathRow();
   }
 });
 
-// Open waveform preview window
+// Open detail settings (waveform preview)
 document.getElementById('open-preview-btn').addEventListener('click', async () => {
   await invoke('open_silence_preview');
 });
@@ -164,15 +177,11 @@ document.getElementById('language').addEventListener('change', (e) => {
 
 // Save
 document.getElementById('save-btn').addEventListener('click', async () => {
-  const outputDest = document.querySelector('input[name="outputDest"]:checked')?.value;
-  const sourceFileAction = document.querySelector('input[name="sourceAction"]:checked')?.value;
-  const nameConflict = document.querySelector('input[name="nameConflict"]:checked')?.value;
-
   const updated = {
     ...settings,
-    outputDest: outputDest || 'source_folder',
-    sourceFileAction: sourceFileAction || 'keep',
-    nameConflict: nameConflict || 'auto_rename',
+    outputDest: document.getElementById('outputDest').value || 'source_folder',
+    sourceFileAction: document.getElementById('sourceAction').value || 'keep',
+    nameConflict: document.getElementById('nameConflict').value || 'auto_rename',
     mp3Preset: document.getElementById('mp3Preset').value,
     mp3Mode: document.querySelector('input[name="mp3Mode"]:checked')?.value || 'cbr',
     mp3Bitrate: parseInt(document.getElementById('mp3Bitrate').value, 10) || 192,
@@ -193,20 +202,18 @@ document.getElementById('save-btn').addEventListener('click', async () => {
     flacCompression: parseInt(document.getElementById('flacCompression').value, 10),
     alacPreset: document.getElementById('alacPreset').value,
     alacBitDepth: parseInt(document.getElementById('alacBitDepth').value, 10) || 16,
-    silenceTrimDb: parseFloat(document.getElementById('silenceTrimDb').value) || -80,
-    silenceTrimDurationMs: parseInt(document.getElementById('silenceTrimDurationMs').value, 10) || 50,
-    ...['mp3', 'aac', 'opus', 'flac', 'alac', 'wav', 'aiff'].reduce((acc, fmt) => {
-      const key = 'silenceTrim' + fmt.charAt(0).toUpperCase() + fmt.slice(1);
-      acc[key] = document.querySelector(`.silence-trim-check[data-fmt="${fmt}"]`)?.checked || false;
-      return acc;
-    }, {}),
+    silenceTrimEnabled: document.getElementById('silenceTrimEnabled').checked,
     openInFinder: document.getElementById('openInFinder').checked,
     preserveFolderStructure: document.getElementById('preserveFolderStructure').checked,
     customOutputPath: customPath,
     language: document.getElementById('language').value,
     enabledFormats: (() => {
-      const checked = [...document.querySelectorAll('.fmt-check:checked')].map((cb) => cb.dataset.fmt);
+      const checked = [...document.querySelectorAll('#encode-fmt-group .fmt-toggle-btn.active')].map((btn) => btn.dataset.fmt);
       return checked.length > 0 ? checked : ['mp3'];
+    })(),
+    enabledDecodeFormats: (() => {
+      const checked = [...document.querySelectorAll('.decode-toggle-btn.active')].map((btn) => btn.dataset.fmt);
+      return checked.length > 0 ? checked : ['wav'];
     })(),
   };
 
