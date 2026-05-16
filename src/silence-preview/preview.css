@@ -184,15 +184,15 @@ body {
 }
 
 .play-icon-btn {
-  background: #2d7a4f;
+  background: #10b981;
 }
 
 .play-icon-btn:hover {
-  background: #359160;
+  background: #059669;
 }
 
 .stop-icon-btn {
-  background: #b91c1c;
+  background: #ef4444;
 }
 
 .stop-icon-btn:hover {
@@ -339,12 +339,12 @@ body {
 }
 
 .apply-btn {
-  background: #2d7a4f;
+  background: #0369a1;
   color: rgba(255, 255, 255, 0.95);
 }
 
 .apply-btn:hover {
-  background: #359160;
+  background: #075985;
 }
 
 /* Selection overlay on waveform */
