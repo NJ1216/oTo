@@ -15,20 +15,50 @@ const dbInput    = document.getElementById('previewDb');
 const durInput   = document.getElementById('previewDurationMs');
 const statusEl   = document.getElementById('analyze-status');
 
+// Playback elements
+const btnPlayFromStart = document.getElementById('btn-play-from-start');
+const btnPlayLastTrim  = document.getElementById('btn-play-last-trim');
+const btnStop          = document.getElementById('btn-stop');
+const playbackBtns     = document.getElementById('playback-btns');
+const volumeSlider     = document.getElementById('volume-slider');
+const volumeValueEl    = document.getElementById('volume-value');
+const preplayInput     = document.getElementById('preplay-seconds');
+
 let currentPath    = null;
-let waveformPeaks  = null;
+let waveformLevels = [];
 let totalDuration  = 0;
 let analyzeTimer   = null;
 let silenceRegions = [];
+let channelCount   = 1;
 
 // --- Zoom state ---
-let viewStart = 0;   // 0.0–1.0 割合
+let viewStart = 0;
 let viewEnd   = 1;
 let vertScale = 1;
 
 // --- Selection drag state ---
 let isDragSelecting = false;
 let selDragStartX   = null;
+
+// --- Middle-click scroll state ---
+let isMiddleScrolling = false;
+let midScrollStartX   = null;
+let midScrollStartViewStart = 0;
+let midScrollStartViewEnd   = 0;
+
+// --- Playback state ---
+let audioElement = null;
+let decodedWavPath = null;
+let isPlaying = false;
+let playbackMode = null;
+let volume = 1.0;
+let playbackProgress = 0;
+let playbackAnimFrame = null;
+let playbackStopTime = 0;
+
+// --- Trim points ---
+let firstSilenceEnd = 0;
+let lastSilenceStart = 0;
 
 // --- Init ---
 async function init() {
@@ -43,16 +73,38 @@ async function init() {
 
 function applyI18n() {
   const win = window.__TAURI__.webviewWindow.getCurrentWebviewWindow();
-  win.setTitle(t('silencePreview.title'));
-  document.title = t('silencePreview.title');
+  win.setTitle(t('settings.silencePreview.title'));
+  document.title = t('settings.silencePreview.title');
   dropHint.textContent = t('silencePreview.drop');
-  emptyEl.textContent  = t('silencePreview.empty');
-  document.getElementById('zoom-hint').textContent      = t('silencePreview.zoomHint');
   document.getElementById('legend-silence').textContent = t('silencePreview.silenceLabel');
   document.getElementById('legend-keep').textContent    = t('silencePreview.keepLabel');
 }
 
-// --- Drag & Drop via Tauri native events (fixes main-window interference) ---
+// --- Help overlay ---
+const helpTrigger = document.getElementById('help-trigger');
+const helpOverlay = document.getElementById('help-overlay');
+
+helpTrigger.addEventListener('mouseenter', () => {
+  helpOverlay.classList.add('visible');
+});
+
+helpTrigger.addEventListener('mouseleave', (e) => {
+  setTimeout(() => {
+    if (!helpOverlay.matches(':hover') && !helpTrigger.matches(':hover')) {
+      helpOverlay.classList.remove('visible');
+    }
+  }, 100);
+});
+
+helpOverlay.addEventListener('mouseenter', () => {
+  helpOverlay.classList.add('visible');
+});
+
+helpOverlay.addEventListener('mouseleave', () => {
+  helpOverlay.classList.remove('visible');
+});
+
+// --- Drag & Drop ---
 listen('tauri://drag-enter', () => {
   dropZone.classList.add('drag-over');
 });
@@ -76,7 +128,8 @@ listen('tauri://drag-drop', async (event) => {
 
 async function loadFile(path, name) {
   currentPath    = path;
-  waveformPeaks  = null;
+  waveformLevels = [];
+  channelCount   = 1;
   silenceRegions = [];
   viewStart = 0;
   viewEnd   = 1;
@@ -87,18 +140,41 @@ async function loadFile(path, name) {
   fileInfo.classList.remove('hidden');
   emptyEl.classList.add('hidden');
   clearCanvas();
-  statusEl.textContent = '波形を読み込み中…';
+  statusEl.textContent = t('silencePreview.loadingWaveform');
+
+  stopPlayback();
+  if (decodedWavPath) {
+    URL.revokeObjectURL(decodedWavPath);
+    decodedWavPath = null;
+  }
+  firstSilenceEnd = 0;
+  lastSilenceStart = 0;
+  playbackProgress = 0;
 
   try {
     const data = await invoke('get_waveform_data', { path });
-    waveformPeaks = data.peaksCh0;
+    waveformLevels = data.levels;
+    channelCount = data.channels;
     totalDuration = data.durationSecs;
     fileDurEl.textContent = formatDuration(totalDuration);
     redraw();
     statusEl.textContent = '';
     scheduleAnalyze();
+
+    try {
+      const wavBase64 = await invoke('decode_to_wav', { path });
+      const binaryString = atob(wavBase64);
+      const bytes = new Uint8Array(binaryString.length);
+      for (let i = 0; i < binaryString.length; i++) {
+        bytes[i] = binaryString.charCodeAt(i);
+      }
+      const blob = new Blob([bytes], { type: 'audio/wav' });
+      decodedWavPath = URL.createObjectURL(blob);
+    } catch (e) {
+      console.error('WAV decode failed:', e);
+    }
   } catch (err) {
-    statusEl.textContent = 'エラー: ' + err;
+    statusEl.textContent = t('silencePreview.error', { msg: err });
   }
 }
 
@@ -111,10 +187,12 @@ function clearCanvas() {
 }
 
 function redraw() {
-  drawWaveform(waveformPeaks, silenceRegions);
+  if (waveformLevels.length === 0) return;
+  const levelIdx = waveformLevels.length - 1;
+  drawWaveform([waveformLevels[levelIdx].peaks], silenceRegions);
 }
 
-function drawWaveform(peaks, regions) {
+function drawWaveform(allChannels, regions) {
   const W = canvas.offsetWidth  || 800;
   const H = canvas.offsetHeight || 300;
   canvas.width  = W;
@@ -123,18 +201,11 @@ function drawWaveform(peaks, regions) {
   const ctx = canvas.getContext('2d');
   ctx.clearRect(0, 0, W, H);
 
-  if (!peaks || peaks.length === 0) return;
+  if (!allChannels || allChannels.length === 0 || allChannels[0].length === 0) return;
 
-  const startIdx = Math.floor(viewStart * peaks.length);
-  const endIdx   = Math.ceil(viewEnd   * peaks.length);
-  const visible  = peaks.slice(startIdx, endIdx);
-  if (visible.length === 0) return;
+  const numChannels = allChannels.length;
+  const channelH = H / numChannels;
 
-  const midY   = H / 2;
-  const scaleY = midY * 0.92 * Math.min(vertScale, 50);
-  const barW   = W / visible.length;
-
-  // Silence overlay regions
   if (regions.length > 0 && totalDuration > 0) {
     ctx.fillStyle = 'rgba(239, 68, 68, 0.18)';
     const tStart = viewStart * totalDuration;
@@ -146,28 +217,76 @@ function drawWaveform(peaks, regions) {
     }
   }
 
-  // Waveform bars
-  for (let i = 0; i < visible.length; i++) {
-    const [mn, mx] = visible[i];
-    const x  = i * barW;
-    const y1 = midY - Math.min(mx * scaleY,  midY);
-    const y2 = midY - Math.max(mn * scaleY, -midY);
+  for (let ch = 0; ch < numChannels; ch++) {
+    const peaks = allChannels[ch];
+    const startIdx = Math.floor(viewStart * peaks.length);
+    const endIdx   = Math.ceil(viewEnd   * peaks.length);
+    const offsetY = ch * channelH;
+    drawChannel(ctx, peaks, startIdx, endIdx, regions, W, channelH, offsetY, vertScale);
 
-    const tPos = (viewStart + (i / visible.length) * (viewEnd - viewStart)) * totalDuration;
+    if (ch > 0) {
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.15)';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(0, offsetY);
+      ctx.lineTo(W, offsetY);
+      ctx.stroke();
+    }
+  }
+
+  // Playback position indicator
+  if (isPlaying && playbackProgress > 0 && totalDuration > 0) {
+    const tStart = viewStart * totalDuration;
+    const tRange = (viewEnd - viewStart) * totalDuration;
+    const px = ((playbackProgress - tStart) / tRange) * W;
+    if (px >= 0 && px <= W) {
+      ctx.strokeStyle = '#fbbf24';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(px, 0);
+      ctx.lineTo(px, H);
+      ctx.stroke();
+    }
+  }
+}
+
+function drawChannel(ctx, peaks, startIdx, endIdx, regions, canvasW, halfH, offsetY, vScale) {
+  const midY = offsetY + halfH / 2;
+  const scaleY = (halfH / 2) * 0.92 * Math.min(vScale, 50);
+  const visibleCount = endIdx - startIdx;
+  if (visibleCount <= 0) return;
+
+  const barW = 1;
+  const bucketSize = visibleCount / canvasW;
+
+  for (let px = 0; px < canvasW; px++) {
+    const bStart = startIdx + Math.floor(px * bucketSize);
+    const bEnd   = startIdx + Math.floor((px + 1) * bucketSize);
+    let mn = 0, mx = 0;
+    for (let i = bStart; i < bEnd; i++) {
+      const [vMn, vMx] = peaks[i];
+      if (vMn < mn) mn = vMn;
+      if (vMx > mx) mx = vMx;
+    }
+
+    const x = px;
+    const y1 = midY - Math.min(mx * scaleY, halfH / 2);
+    const y2 = midY - Math.max(mn * scaleY, -halfH / 2);
+
+    const tPos = (viewStart + (px / canvasW) * (viewEnd - viewStart)) * totalDuration;
     const inSilence = regions.some(([s, e]) => tPos >= s && tPos <= e);
 
     ctx.fillStyle = inSilence
-      ? 'rgba(239, 68, 68, 0.65)'
-      : 'rgba(99, 102, 241, 0.75)';
-    ctx.fillRect(x, y1, Math.max(barW - 0.5, 0.5), Math.max(y2 - y1, 1));
+      ? 'rgba(239, 68, 68, 0.6)'
+      : 'rgba(99, 102, 241, 0.7)';
+    ctx.fillRect(x, y1, barW, Math.max(y2 - y1, 1));
   }
 
-  // Center line
   ctx.strokeStyle = 'rgba(255, 255, 255, 0.07)';
   ctx.lineWidth = 1;
   ctx.beginPath();
   ctx.moveTo(0, midY);
-  ctx.lineTo(W, midY);
+  ctx.lineTo(canvasW, midY);
   ctx.stroke();
 }
 
@@ -178,40 +297,271 @@ function scheduleAnalyze() {
 }
 
 async function runAnalyze() {
-  if (!currentPath || !waveformPeaks) return;
+  if (!currentPath || waveformLevels.length === 0) return;
   const db  = parseFloat(dbInput.value)   || -80;
   const dur = parseInt(durInput.value, 10) || 50;
 
-  statusEl.textContent = '解析中…';
+  statusEl.textContent = t('silencePreview.analyzing');
   try {
-    silenceRegions = await invoke('get_silence_regions', { path: currentPath, db, durationMs: dur });
+    const levelIdx = waveformLevels.length - 1;
+    const level = waveformLevels[levelIdx];
+    silenceRegions = detectSilence(level.rms, db, dur / 1000.0);
     redraw();
     const count   = silenceRegions.length;
     const trimmed = silenceRegions.reduce((s, [a, b]) => s + (b - a), 0);
     statusEl.textContent = count > 0
-      ? `${count}箇所 / 合計 ${trimmed.toFixed(2)}秒 の無音を検出`
-      : '無音なし';
+      ? t('silencePreview.silenceDetected', { count, total: trimmed.toFixed(2) })
+      : t('silencePreview.noSilence');
+
+    if (silenceRegions.length > 0) {
+      firstSilenceEnd = silenceRegions[0][1];
+      if (silenceRegions.length > 1) {
+        lastSilenceStart = silenceRegions[silenceRegions.length - 1][0];
+      } else {
+        lastSilenceStart = 0;
+      }
+    } else {
+      firstSilenceEnd = 0;
+      lastSilenceStart = 0;
+    }
   } catch (err) {
-    statusEl.textContent = 'エラー: ' + err;
+    statusEl.textContent = t('silencePreview.error', { msg: err });
   }
 }
 
-// Input changes trigger auto-analyze
+function detectSilence(rmsValues, db, minDurationSecs) {
+  const dbLinear = Math.pow(10, db / 20);
+  const n = rmsValues.length;
+  if (n === 0) return [];
+
+  const sampleDur = totalDuration / n;
+  const allRegions = [];
+  let inSilence = false;
+  let silenceStart = 0;
+
+  for (let i = 0; i < n; i++) {
+    const isQuiet = rmsValues[i] < dbLinear;
+
+    if (isQuiet && !inSilence) {
+      inSilence = true;
+      silenceStart = i * sampleDur;
+    } else if (!isQuiet && inSilence) {
+      const silenceEnd = i * sampleDur;
+      if (silenceEnd - silenceStart >= minDurationSecs) {
+        allRegions.push([silenceStart, silenceEnd]);
+      }
+      inSilence = false;
+    }
+  }
+
+  if (inSilence) {
+    const silenceEnd = totalDuration;
+    if (silenceEnd - silenceStart >= minDurationSecs) {
+      allRegions.push([silenceStart, silenceEnd]);
+    }
+  }
+
+  if (allRegions.length === 0) return [];
+  const result = [allRegions[0]];
+  if (allRegions.length > 1 && allRegions[allRegions.length - 1] !== allRegions[0]) {
+    result.push(allRegions[allRegions.length - 1]);
+  }
+  return result;
+}
+
 [dbInput, durInput].forEach((el) => {
   el.addEventListener('input', () => {
-    if (waveformPeaks) scheduleAnalyze();
+    if (waveformLevels.length > 0) scheduleAnalyze();
   });
 });
 
-// --- Zoom: keyboard shortcuts ---
+// --- Playback ---
+function updatePlaybackButtons() {
+  if (isPlaying) {
+    btnPlayFromStart.classList.add('hidden');
+    btnPlayLastTrim.classList.add('hidden');
+    btnStop.classList.remove('hidden');
+  } else {
+    btnPlayFromStart.classList.remove('hidden');
+    btnPlayLastTrim.classList.remove('hidden');
+    btnStop.classList.add('hidden');
+  }
+}
+
+function stopPlayback() {
+  if (playbackAnimFrame) {
+    cancelAnimationFrame(playbackAnimFrame);
+    playbackAnimFrame = null;
+  }
+  if (audioElement) {
+    audioElement.pause();
+    audioElement.onended = null;
+    audioElement.ontimeupdate = null;
+    audioElement = null;
+  }
+  isPlaying = false;
+  playbackMode = null;
+  playbackStopTime = 0;
+  updatePlaybackButtons();
+}
+
+function createAudio() {
+  if (!decodedWavPath) return null;
+  const audio = new Audio(decodedWavPath);
+  audio.volume = volume;
+  audio.preload = 'auto';
+  return audio;
+}
+
+function updatePlaybackPosition(ratio) {
+  playbackProgress = ratio * totalDuration;
+  redraw();
+}
+
+function startProgressTracking() {
+  if (!audioElement) return;
+  function tick() {
+    if (!audioElement || audioElement.paused) return;
+    if (playbackStopTime > 0 && audioElement.currentTime >= playbackStopTime) {
+      stopPlayback();
+      return;
+    }
+    const ratio = audioElement.duration > 0 ? audioElement.currentTime / audioElement.duration : 0;
+    updatePlaybackPosition(ratio);
+    playbackAnimFrame = requestAnimationFrame(tick);
+  }
+  playbackAnimFrame = requestAnimationFrame(tick);
+}
+
+function playFromTrimStart() {
+  if (!decodedWavPath || totalDuration === 0) return;
+  const startTime = firstSilenceEnd > 0 ? firstSilenceEnd : 0;
+  if (startTime >= totalDuration) return;
+
+  stopPlayback();
+  const audio = createAudio();
+  if (!audio) return;
+
+  audioElement = audio;
+  audio.currentTime = startTime;
+  playbackMode = 'from-trim-start';
+  playbackStopTime = 0;
+  isPlaying = true;
+  updatePlaybackButtons();
+
+  audio.onended = () => {
+    stopPlayback();
+  };
+
+  audio.play().catch(() => {
+    stopPlayback();
+  });
+
+  startProgressTracking();
+}
+
+function playLastTrim() {
+  if (!decodedWavPath || totalDuration === 0) return;
+  if (lastSilenceStart <= 0) return;
+
+  const preplaySecs = parseFloat(preplayInput.value) || 2;
+  const startTime = Math.max(0, lastSilenceStart - preplaySecs);
+
+  stopPlayback();
+  const audio = createAudio();
+  if (!audio) return;
+
+  audioElement = audio;
+  audio.currentTime = startTime;
+  playbackMode = 'last-trim';
+  playbackStopTime = lastSilenceStart;
+  isPlaying = true;
+  updatePlaybackButtons();
+
+  audio.onended = () => {
+    stopPlayback();
+  };
+
+  audio.play().catch(() => {
+    stopPlayback();
+  });
+
+  startProgressTracking();
+}
+
+function togglePlayStop() {
+  if (isPlaying) {
+    stopPlayback();
+    playbackProgress = 0;
+    redraw();
+  } else {
+    playFromTrimStart();
+  }
+}
+
+// --- Playback event handlers ---
+btnPlayFromStart.addEventListener('click', () => {
+  playFromTrimStart();
+});
+
+btnPlayLastTrim.addEventListener('click', () => {
+  playLastTrim();
+});
+
+btnStop.addEventListener('click', () => {
+  stopPlayback();
+  playbackProgress = 0;
+  redraw();
+});
+
+// --- Volume control ---
+volumeSlider.addEventListener('input', () => {
+  volume = parseInt(volumeSlider.value, 10) / 100;
+  volumeValueEl.textContent = `${volumeSlider.value}%`;
+  if (audioElement) {
+    audioElement.volume = volume;
+  }
+});
+
+// --- Cancel / Apply buttons ---
+const btnCancel = document.getElementById('btn-cancel');
+const btnApply  = document.getElementById('btn-apply');
+
+btnCancel.addEventListener('click', async () => {
+  const win = window.__TAURI__.webviewWindow.getCurrentWebviewWindow();
+  await win.close();
+});
+
+btnApply.addEventListener('click', async () => {
+  try {
+    const s = await invoke('get_settings');
+    s.silenceTrimDb = parseFloat(dbInput.value) || -80;
+    s.silenceTrimDurationMs = parseInt(durInput.value, 10) || 50;
+    await invoke('save_settings', { s });
+  } catch (_) {}
+  const win = window.__TAURI__.webviewWindow.getCurrentWebviewWindow();
+  await win.close();
+});
+
+// --- Keyboard shortcuts ---
 document.addEventListener('keydown', (e) => {
+  if (e.code === 'Space' && currentPath && decodedWavPath) {
+    e.preventDefault();
+    if (e.shiftKey) {
+      playLastTrim();
+    } else {
+      togglePlayStop();
+    }
+    return;
+  }
+
   const key = e.key.toLowerCase();
   if (key === 'g' && !e.shiftKey) {
-    zoomHorizontal(1 / 1.5);
+    zoomHorizontal(1.5, 0.5);
   } else if (key === 'h' && !e.shiftKey) {
-    zoomHorizontal(1.5);
+    zoomHorizontal(1 / 1.5, 0.5);
   } else if (key === 'g' && e.shiftKey) {
-    vertScale = Math.max(0.1, vertScale / 1.5);
+    vertScale = Math.max(1, vertScale / 1.5);
     redraw();
   } else if (key === 'h' && e.shiftKey) {
     vertScale = Math.min(50, vertScale * 1.5);
@@ -219,36 +569,89 @@ document.addEventListener('keydown', (e) => {
   }
 });
 
-function zoomHorizontal(factor) {
-  const center  = (viewStart + viewEnd) / 2;
-  let   range   = (viewEnd - viewStart) * factor;
+function zoomHorizontal(factor, pivotRatio) {
+  let range = (viewEnd - viewStart) * factor;
   range = Math.max(0.005, Math.min(1, range));
-  viewStart = Math.max(0, center - range / 2);
-  viewEnd   = Math.min(1, viewStart + range);
-  if (viewEnd === 1) viewStart = Math.max(0, 1 - range);
+  const pivot = pivotRatio !== undefined
+    ? viewStart + pivotRatio * (viewEnd - viewStart)
+    : (viewStart + viewEnd) / 2;
+  viewStart = pivot - range * (pivot - viewStart) / (viewEnd - viewStart || 1);
+  viewEnd   = viewStart + range;
+  if (viewStart < 0) { viewEnd -= viewStart; viewStart = 0; }
+  if (viewEnd > 1)   { viewStart -= viewEnd - 1; viewEnd = 1; }
+  viewStart = Math.max(0, viewStart);
+  viewEnd   = Math.min(1, viewEnd);
   redraw();
 }
 
-// --- Zoom: canvas mouse (range selection + click reset) ---
+canvas.addEventListener('wheel', (e) => {
+  e.preventDefault();
+  if (waveformLevels.length === 0) return;
+
+  if (e.shiftKey) {
+    const delta = e.deltaY !== 0 ? e.deltaY : e.deltaX;
+    const factor = delta < 0 ? 1.15 : 1 / 1.15;
+    vertScale = Math.max(1, Math.min(50, vertScale * factor));
+    redraw();
+  } else {
+    const rect = canvas.getBoundingClientRect();
+    const pivotRatio = (e.clientX - rect.left) / rect.width;
+    const factor = e.deltaY > 0 ? 1.15 : 1 / 1.15;
+    zoomHorizontal(factor, pivotRatio);
+  }
+}, { passive: false });
+
 canvas.style.cursor = 'text';
 
 canvas.addEventListener('mousedown', (e) => {
-  if (!waveformPeaks) return;
-  if (e.shiftKey) {
-    // Shift+click: reset vertical zoom
+  if (waveformLevels.length === 0) return;
+  if (e.button === 1) {
+    e.preventDefault();
+    isMiddleScrolling = true;
+    midScrollStartX = e.clientX;
+    midScrollStartViewStart = viewStart;
+    midScrollStartViewEnd = viewEnd;
+    canvas.style.cursor = 'grabbing';
+    return;
+  }
+  if (e.button === 0 && e.shiftKey) {
     vertScale = 1;
     redraw();
     return;
   }
-  isDragSelecting = true;
-  selDragStartX   = e.offsetX;
-  selOverlay.style.display = 'none';
+  if (e.button === 0) {
+    isDragSelecting = true;
+    selDragStartX   = e.offsetX;
+    selOverlay.style.display = 'none';
+  }
 });
 
-canvas.addEventListener('mousemove', (e) => {
+canvas.addEventListener('auxclick', (e) => {
+  if (e.button === 1) {
+    e.preventDefault();
+  }
+});
+
+window.addEventListener('mousemove', (e) => {
+  if (isMiddleScrolling) {
+    const dx = e.clientX - midScrollStartX;
+    const W = canvas.offsetWidth || 800;
+    const range = midScrollStartViewEnd - midScrollStartViewStart;
+    const shift = -(dx / W) * range;
+    let newStart = midScrollStartViewStart + shift;
+    let newEnd = midScrollStartViewEnd + shift;
+    if (newStart < 0) { newEnd -= newStart; newStart = 0; }
+    if (newEnd > 1) { newStart -= newEnd - 1; newEnd = 1; }
+    viewStart = Math.max(0, newStart);
+    viewEnd = Math.min(1, newEnd);
+    redraw();
+    return;
+  }
   if (!isDragSelecting) return;
-  const x1 = Math.min(selDragStartX, e.offsetX);
-  const x2 = Math.max(selDragStartX, e.offsetX);
+  const rect = canvas.getBoundingClientRect();
+  const offsetX = e.clientX - rect.left;
+  const x1 = Math.min(selDragStartX, offsetX);
+  const x2 = Math.max(selDragStartX, offsetX);
   if (x2 - x1 > 2) {
     selOverlay.style.left    = x1 + 'px';
     selOverlay.style.width   = (x2 - x1) + 'px';
@@ -256,24 +659,29 @@ canvas.addEventListener('mousemove', (e) => {
   }
 });
 
-canvas.addEventListener('mouseup', (e) => {
+window.addEventListener('mouseup', (e) => {
+  if (isMiddleScrolling) {
+    isMiddleScrolling = false;
+    canvas.style.cursor = 'text';
+    return;
+  }
   if (!isDragSelecting) return;
   isDragSelecting = false;
   selOverlay.style.display = 'none';
 
-  const x1 = Math.min(selDragStartX, e.offsetX);
-  const x2 = Math.max(selDragStartX, e.offsetX);
+  const rect = canvas.getBoundingClientRect();
+  const offsetX = Math.max(0, Math.min(e.clientX - rect.left, canvas.offsetWidth));
+  const x1 = Math.min(selDragStartX, offsetX);
+  const x2 = Math.max(selDragStartX, offsetX);
   const W  = canvas.offsetWidth || 800;
 
   if (x2 - x1 < 4) {
-    // Click: reset horizontal zoom
     viewStart = 0;
     viewEnd   = 1;
     redraw();
     return;
   }
 
-  // Zoom into selection
   const currentRange = viewEnd - viewStart;
   const newStart = viewStart + (x1 / W) * currentRange;
   const newEnd   = viewStart + (x2 / W) * currentRange;
@@ -282,19 +690,10 @@ canvas.addEventListener('mouseup', (e) => {
   redraw();
 });
 
-canvas.addEventListener('mouseleave', () => {
-  if (isDragSelecting) {
-    isDragSelecting = false;
-    selOverlay.style.display = 'none';
-  }
-});
-
-// --- Resize ---
 window.addEventListener('resize', () => {
-  if (waveformPeaks) redraw();
+  if (waveformLevels.length > 0) redraw();
 });
 
-// --- Helpers ---
 function formatDuration(secs) {
   const m = Math.floor(secs / 60);
   const s = (secs % 60).toFixed(2).padStart(5, '0');

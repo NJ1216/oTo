@@ -3,13 +3,13 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>無音トリミング - 詳細設定</title>
+  <title data-i18n="silencePreview.title">無音トリミング - 詳細設定</title>
   <link rel="stylesheet" href="preview.css" />
 </head>
 <body>
   <div id="app">
     <div id="drop-zone" class="drop-zone">
-      <p id="drop-hint" class="drop-hint">音声ファイルをここにドロップ</p>
+      <p id="drop-hint" class="drop-hint" data-i18n="silencePreview.drop">音声ファイルをここにドロップ</p>
       <div id="file-info" class="file-info hidden">
         <span id="file-name" class="file-name"></span>
         <span id="file-duration" class="file-duration"></span>
@@ -20,30 +20,153 @@
       <canvas id="waveform" class="waveform"></canvas>
       <div id="selection-overlay" class="selection-overlay"></div>
       <div id="waveform-empty" class="waveform-empty">
-        ファイルをドロップすると波形が表示されます
+        <div class="waveform-empty-content">
+          <p class="waveform-empty-title" data-i18n="silencePreview.emptyTitle">音声ファイルをドロップ</p>
+          <p class="waveform-empty-desc" data-i18n="silencePreview.emptyDesc">ドロップしたファイルの無音領域を解析し、トリミング前後の再生プレビューで確認できます。ここでの調整はプレビューのみで、実際のトリミングを適用するには設定画面で「無音トリミング」をONにしてください。</p>
+        </div>
       </div>
     </div>
 
     <div id="controls" class="controls">
       <div class="ctrl-row">
-        <label id="label-db">検出レベル</label>
+        <label id="label-db" data-i18n="silencePreview.detectionLevel">検出レベル</label>
         <input type="number" id="previewDb" min="-100" max="-1" step="1" value="-80" />
         <span class="unit">dB</span>
-        <label id="label-dur">最短無音時間</label>
+        <label id="label-dur" data-i18n="silencePreview.minSilenceTime">最短無音時間</label>
         <input type="number" id="previewDurationMs" min="10" max="2000" step="10" value="50" />
         <span class="unit">ms</span>
         <span id="analyze-status" class="analyze-status"></span>
-      </div>
-      <div class="ctrl-row zoom-hint-row">
-        <span id="zoom-hint" class="zoom-hint">g/h: 横ズーム　Shift+g/h: 縦ズーム　クリック: リセット</span>
-      </div>
-      <div class="legend-row">
-        <span class="legend-swatch silence-swatch"></span>
-        <span id="legend-silence" class="legend-label">除去される無音領域</span>
-        <span class="legend-swatch keep-swatch"></span>
-        <span id="legend-keep" class="legend-label">保持される音声</span>
+        <div id="playback-btns" class="playback-btns">
+          <button id="btn-play-from-start" class="icon-btn play-icon-btn" title="最初の無音トリミング後から再生 (Space)">
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+              <rect x="2" y="2" width="3" height="12" rx="0.5" fill="currentColor"/>
+              <polygon points="6,2 15,8 6,14" fill="currentColor"/>
+            </svg>
+          </button>
+          <button id="btn-play-last-trim" class="icon-btn play-icon-btn" title="最後のトリミング箇所を確認 (Shift+Space)">
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+              <polygon points="1,2 10,8 1,14" fill="currentColor"/>
+              <rect x="11" y="2" width="3" height="12" rx="0.5" fill="currentColor"/>
+            </svg>
+          </button>
+          <button id="btn-stop" class="icon-btn stop-icon-btn hidden" title="再生停止 (Space)">
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+              <rect x="3" y="3" width="10" height="10" rx="1" fill="currentColor"/>
+            </svg>
+          </button>
+        </div>
       </div>
 
+      <div id="playback-controls" class="playback-controls">
+        <div class="playback-settings-row">
+          <div class="volume-control">
+            <svg width="14" height="14" viewBox="0 0 16 16" fill="none" class="volume-icon">
+              <polygon points="2,5 5,5 9,1 9,15 5,11 2,11" fill="currentColor"/>
+              <path d="M11 5.5C11.8 6.3 12.2 7.1 12.2 8C12.2 8.9 11.8 9.7 11 10.5" stroke="currentColor" stroke-width="1.2" fill="none" stroke-linecap="round"/>
+              <path d="M12.5 4C13.7 5.2 14.3 6.5 14.3 8C14.3 9.5 13.7 10.8 12.5 12" stroke="currentColor" stroke-width="1.2" fill="none" stroke-linecap="round"/>
+            </svg>
+            <input type="range" id="volume-slider" min="0" max="100" value="100" class="volume-slider" />
+            <span id="volume-value" class="volume-value">100%</span>
+          </div>
+          <div class="preplay-control">
+            <label id="label-preplay" data-i18n="silencePreview.prePlaySeconds">プリプレイ</label>
+            <input type="number" id="preplay-seconds" min="0" max="10" step="0.5" value="2" />
+            <span class="unit">sec</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="legend-row">
+        <span class="legend-swatch silence-swatch"></span>
+        <span id="legend-silence" class="legend-label" data-i18n="silencePreview.silenceLabel">除去される無音領域</span>
+        <span class="legend-swatch keep-swatch"></span>
+        <span id="legend-keep" class="legend-label" data-i18n="silencePreview.keepLabel">保持される音声</span>
+      </div>
+
+      <div class="action-btns">
+        <button id="btn-cancel" class="action-btn cancel-btn" data-i18n="silencePreview.cancel">キャンセル</button>
+        <button id="btn-apply" class="action-btn apply-btn" data-i18n="silencePreview.apply">適用</button>
+      </div>
+
+    </div>
+
+    <div id="help-trigger" class="help-trigger">
+      <span data-i18n="silencePreview.helpTrigger">操作方法</span>
+    </div>
+
+    <div id="help-overlay" class="help-overlay">
+      <div class="help-content">
+        <h4 data-i18n="silencePreview.helpTitle">キーボードショートカット</h4>
+        <div class="help-section">
+          <div class="help-row">
+            <div class="help-keys">
+              <span class="help-key"><span>Space</span></span>
+            </div>
+            <span class="help-desc" data-i18n="silencePreview.helpPlayStop">開始トリム再生 / 停止</span>
+          </div>
+          <div class="help-row">
+            <div class="help-keys">
+              <span class="help-key"><span>Shift</span><span>Space</span></span>
+            </div>
+            <span class="help-desc" data-i18n="silencePreview.helpPlayLastTrim">末尾トリム再生</span>
+          </div>
+          <div class="help-row">
+            <div class="help-keys">
+              <span class="help-key"><span>H</span></span>
+              <span class="help-sep">/</span>
+              <span class="help-key"><span>G</span></span>
+            </div>
+            <span class="help-desc" data-i18n="silencePreview.helpTimeZoom">時間軸ズームイン/アウト</span>
+          </div>
+          <div class="help-row">
+            <div class="help-keys">
+              <span class="help-key"><span>Shift</span><span>H</span></span>
+              <span class="help-sep">/</span>
+              <span class="help-key"><span>G</span></span>
+            </div>
+            <span class="help-desc" data-i18n="silencePreview.helpVertZoom">縦軸ズームイン/アウト</span>
+          </div>
+          <div class="help-row">
+            <div class="help-keys">
+              <span class="help-key"><span data-i18n="silencePreview.helpKeyWheel">ホイール</span></span>
+            </div>
+            <span class="help-desc" data-i18n="silencePreview.helpWheelTime">時間軸ズーム</span>
+          </div>
+          <div class="help-row">
+            <div class="help-keys">
+              <span class="help-key"><span>Shift</span><span data-i18n="silencePreview.helpKeyWheel">ホイール</span></span>
+            </div>
+            <span class="help-desc" data-i18n="silencePreview.helpWheelVert">縦軸ズーム</span>
+          </div>
+        </div>
+        <h4 class="help-section-title" data-i18n="silencePreview.helpMouseTitle">マウス操作</h4>
+        <div class="help-section">
+          <div class="help-row">
+            <div class="help-keys">
+              <span class="help-key"><span data-i18n="silencePreview.helpKeyDrag">ドラッグ</span></span>
+            </div>
+            <span class="help-desc" data-i18n="silencePreview.helpDrag">範囲を選択してズーム</span>
+          </div>
+          <div class="help-row">
+            <div class="help-keys">
+              <span class="help-key"><span data-i18n="silencePreview.helpKeyClick">クリック</span></span>
+            </div>
+            <span class="help-desc" data-i18n="silencePreview.helpReset">ズームリセット</span>
+          </div>
+          <div class="help-row">
+            <div class="help-keys">
+              <span class="help-key"><span>Shift</span><span data-i18n="silencePreview.helpKeyClick">クリック</span></span>
+            </div>
+            <span class="help-desc" data-i18n="silencePreview.helpVertReset">縦軸リセット</span>
+          </div>
+          <div class="help-row">
+            <div class="help-keys">
+              <span class="help-key"><span data-i18n="silencePreview.helpKeyMid">中クリック</span><span>+</span><span data-i18n="silencePreview.helpKeyDrag">ドラッグ</span></span>
+            </div>
+            <span class="help-desc" data-i18n="silencePreview.helpMidScroll">横スクロール</span>
+          </div>
+        </div>
+      </div>
     </div>
   </div>
   <script type="module" src="preview.js"></script>

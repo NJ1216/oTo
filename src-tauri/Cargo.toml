@@ -1,6 +1,6 @@
 [package]
 name = "oto"
-version = "26.5.10"
+version = "26.5.16"
 description = "oTo - Audio Converter"
 authors = ["Akito Matsuda"]
 edition = "2021"
@@ -25,6 +25,7 @@ tokio = { version = "1", features = ["full"] }
 walkdir = "2"
 anyhow = "1"
 dirs = "5"
+base64 = "0.22"
 
 [target.'cfg(unix)'.dependencies]
 libc = "0.2"

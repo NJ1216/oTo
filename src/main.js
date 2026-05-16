@@ -173,13 +173,27 @@ function setDragHover(hovered) {
 }
 
 function registerDragDrop() {
-  listen('tauri://drag-enter', () => setDragHover(true));
+  listen('tauri://drag-enter', async () => {
+    const visible = await invoke('is_silence_preview_visible');
+    if (visible) return;
+    setDragHover(true);
+  });
 
-  listen('tauri://drag-over', () => { if (!isDragging) setDragHover(true); });
+  listen('tauri://drag-over', async () => {
+    const visible = await invoke('is_silence_preview_visible');
+    if (visible) return;
+    if (!isDragging) setDragHover(true);
+  });
 
-  listen('tauri://drag-leave', () => setDragHover(false));
+  listen('tauri://drag-leave', async () => {
+    const visible = await invoke('is_silence_preview_visible');
+    if (visible) return;
+    setDragHover(false);
+  });
 
-  listen('tauri://drag-drop', (event) => {
+  listen('tauri://drag-drop', async (event) => {
+    const visible = await invoke('is_silence_preview_visible');
+    if (visible) return;
     isDragging = false;
     if (isProcessing) return;
 
