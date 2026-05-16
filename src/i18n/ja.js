@@ -119,11 +119,7 @@ export default {
     silencePreview: {
       title: '無音トリミング - 詳細設定',
       drop: '音声ファイルをここにドロップ',
-    emptyTitle: '音声ファイルをドロップ',
-    emptyDesc: 'ドロップしたファイルの無音領域を解析し、トリミング前後の再生プレビューで確認できます。ここでの調整はプレビューのみで、実際のトリミングを適用するには設定画面で「無音トリミング」をONにしてから、音声ファイルをドラッグ&ドロップして変換してください。',
-    cancel: 'キャンセル',
-    apply: '適用',
-      zoomHint: 'g/h: 横ズーム　Shift+g/h: 縦ズーム　クリック: リセット',
+      zoomHint: 'g/h: 横ズーム Shift+g/h: 縦ズーム クリック: リセット',
       silenceLabel: '除去される無音領域',
       keepLabel: '保持される音声',
       playFromTrimStart: 'トリム後から再生',
@@ -136,7 +132,8 @@ export default {
   silencePreview: {
     title: '無音トリミング - 詳細設定',
     drop: '音声ファイルをここにドロップ',
-    empty: 'ファイルをドロップすると波形が表示されます',
+    emptyTitle: '音声ファイルをドロップ',
+    emptyDesc: 'ドロップしたファイルの無音領域を解析し、トリミング前後の再生プレビューで確認できます。ここでの調整はプレビューのみで、実際のトリミングを適用するには設定画面で「無音トリミング」をONにしてから、音声ファイルをドラッグ&ドロップして変換してください。',
     zoomHint: 'g/h: 横ズーム Shift+g/h: 縦ズーム ホイール: カーソル位置ズーム Shift+ホイール: 縦ズーム クリック: リセット',
     silenceLabel: '除去される無音領域',
     keepLabel: '保持される音声',
@@ -167,6 +164,8 @@ export default {
     playFromTrimStart: 'トリム後から再生',
     playLastTrim: '末尾トリム確認',
     prePlaySeconds: 'プリプレイ',
+    cancel: 'キャンセル',
+    apply: '適用',
   },
   about: {
     subtitle: '音声変換ツール',
