@@ -65,7 +65,37 @@ body {
   font-size: 11px;
 }
 
-.hidden { display: none !important; }
+/* UX-5: Loading overlay for waveform computation */
+.waveform-loading {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  background: rgba(21, 21, 32, 0.85);
+  z-index: 5;
+  pointer-events: none;
+}
+
+.loading-spinner {
+  width: 32px;
+  height: 32px;
+  border: 3px solid rgba(255, 255, 255, 0.1);
+  border-top-color: rgba(99, 102, 241, 0.8);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.loading-text {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.45);
+}
 
 /* Waveform */
 .waveform-wrap {

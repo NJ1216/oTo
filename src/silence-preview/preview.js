@@ -12,6 +12,7 @@ const fileDurEl  = document.getElementById('file-duration');
 const canvas     = document.getElementById('waveform');
 const selOverlay = document.getElementById('selection-overlay');
 const emptyEl    = document.getElementById('waveform-empty');
+const loadingEl  = document.getElementById('waveform-loading');
 const dbInput    = document.getElementById('previewDb');
 const durInput   = document.getElementById('previewDurationMs');
 const statusEl   = document.getElementById('analyze-status');
@@ -143,8 +144,9 @@ async function loadFile(path, name) {
   dropHint.classList.add('hidden');
   fileInfo.classList.remove('hidden');
   emptyEl.classList.add('hidden');
+  loadingEl.classList.remove('hidden');
   clearCanvas();
-  statusEl.textContent = t('silencePreview.loadingWaveform');
+  statusEl.textContent = '';
 
   stopPlayback();
   if (currentWavTempPath) {
@@ -162,11 +164,12 @@ async function loadFile(path, name) {
     waveformLevels = data.levels;
     totalDuration = data.durationSecs;
     fileDurEl.textContent = formatDuration(totalDuration);
+    loadingEl.classList.add('hidden');
     redraw();
-    statusEl.textContent = '';
     scheduleAnalyze();
 
     try {
+      statusEl.textContent = t('silencePreview.decodingWav');
       const wavPath = await invoke('decode_to_wav', { path });
       if (gen !== loadGeneration) {
         invoke('delete_temp_wav', { path: wavPath }).catch(() => {});
@@ -174,11 +177,14 @@ async function loadFile(path, name) {
       }
       currentWavTempPath = wavPath;
       decodedWavPath = convertFileSrc(wavPath);
+      if (statusEl.textContent === t('silencePreview.decodingWav')) statusEl.textContent = '';
     } catch (e) {
       console.error('WAV decode failed:', e);
+      if (gen === loadGeneration) statusEl.textContent = '';
     }
   } catch (err) {
     if (gen !== loadGeneration) return;
+    loadingEl.classList.add('hidden');
     statusEl.textContent = t('silencePreview.error', { msg: err });
   }
 }

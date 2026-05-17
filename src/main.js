@@ -116,12 +116,16 @@ function applyDecodeFormatToUI() {
   const enabledDecode = appSettings?.enabledDecodeFormats || ['wav', 'aiff'];
   document.querySelectorAll('.decode-fmt-btn').forEach((btn) => {
     btn.style.display = enabledDecode.includes(btn.dataset.fmt) ? '' : 'none';
-    btn.classList.toggle('active', btn.dataset.fmt === currentDecodeFormat);
+    const active = btn.dataset.fmt === currentDecodeFormat;
+    btn.classList.toggle('active', active);
+    btn.setAttribute('aria-pressed', active ? 'true' : 'false');
   });
   if (!enabledDecode.includes(currentDecodeFormat)) {
     currentDecodeFormat = enabledDecode[0] || 'wav';
     document.querySelectorAll('.decode-fmt-btn').forEach((btn) => {
-      btn.classList.toggle('active', btn.dataset.fmt === currentDecodeFormat);
+      const active = btn.dataset.fmt === currentDecodeFormat;
+      btn.classList.toggle('active', active);
+      btn.setAttribute('aria-pressed', active ? 'true' : 'false');
     });
   }
   setFormat(currentDecodeFormat);
@@ -132,13 +136,17 @@ function applyFormatToUI() {
 
   document.querySelectorAll('.fmt-btn').forEach((btn) => {
     btn.style.display = enabled.includes(btn.dataset.fmt) ? '' : 'none';
-    btn.classList.toggle('active', btn.dataset.fmt === currentFormat);
+    const active = btn.dataset.fmt === currentFormat;
+    btn.classList.toggle('active', active);
+    btn.setAttribute('aria-pressed', active ? 'true' : 'false');
   });
 
   if (!enabled.includes(currentFormat)) {
     currentFormat = enabled[0] || 'mp3';
     document.querySelectorAll('.fmt-btn').forEach((btn) => {
-      btn.classList.toggle('active', btn.dataset.fmt === currentFormat);
+      const active = btn.dataset.fmt === currentFormat;
+      btn.classList.toggle('active', active);
+      btn.setAttribute('aria-pressed', active ? 'true' : 'false');
     });
   }
 

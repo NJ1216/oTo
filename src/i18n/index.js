@@ -24,6 +24,11 @@ function applyDOM() {
     const translated = t(key);
     if (translated !== key) el.textContent = translated;
   });
+  document.querySelectorAll('[data-i18n-label]').forEach((el) => {
+    const key = el.dataset.i18nLabel;
+    const translated = t(key);
+    if (translated !== key) el.setAttribute('aria-label', translated);
+  });
 }
 
 export async function initI18n(lang) {
@@ -31,5 +36,6 @@ export async function initI18n(lang) {
   const mod = await import(`./${resolved}.js`);
   _dict = mod.default;
   document.documentElement.lang = resolved;
+  try { localStorage.setItem('oto_lang', resolved); } catch (_) {}
   applyDOM();
 }

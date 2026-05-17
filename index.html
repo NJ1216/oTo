@@ -3,7 +3,11 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>oTo</title>
+  <!-- HTML-1: lang updated to match saved preference before JS runs -->
+  <script>try { document.documentElement.lang = localStorage.getItem('oto_lang') || 'ja'; } catch (_) {}</script>
+  <!-- HTML-2: data-i18n so applyDOM() keeps title in sync -->
+  <title data-i18n="window.main">oTo</title>
+  <link rel="stylesheet" href="/src/common.css" />
   <link rel="stylesheet" href="/src/style.css" />
 </head>
 <body>
@@ -15,21 +19,21 @@
     <!-- Format selector -->
     <div id="format-selector">
       <!-- ENCODE formats: 非可逆(MP3/AAC/OPUS) → 可逆(FLAC/ALAC) -->
-      <button class="fmt-btn active" data-fmt="mp3">MP3</button>
-      <button class="fmt-btn" data-fmt="aac">AAC</button>
-      <button class="fmt-btn" data-fmt="opus">OPUS</button>
-      <button class="fmt-btn" data-fmt="flac">FLAC</button>
-      <button class="fmt-btn" data-fmt="alac">ALAC</button>
+      <button class="fmt-btn active" data-fmt="mp3" aria-pressed="true">MP3</button>
+      <button class="fmt-btn" data-fmt="aac" aria-pressed="false">AAC</button>
+      <button class="fmt-btn" data-fmt="opus" aria-pressed="false">OPUS</button>
+      <button class="fmt-btn" data-fmt="flac" aria-pressed="false">FLAC</button>
+      <button class="fmt-btn" data-fmt="alac" aria-pressed="false">ALAC</button>
       <!-- DECODE formats -->
-      <button class="decode-fmt-btn active" data-fmt="wav">WAV</button>
-      <button class="decode-fmt-btn" data-fmt="aiff">AIFF</button>
+      <button class="decode-fmt-btn active" data-fmt="wav" aria-pressed="true">WAV</button>
+      <button class="decode-fmt-btn" data-fmt="aiff" aria-pressed="false">AIFF</button>
     </div>
 
     <!-- Mode toggle: encode / decode -->
     <div id="toggle-area">
       <span class="toggle-label">ENCODE</span>
       <label class="toggle-switch">
-        <input type="checkbox" id="mode-toggle" />
+        <input type="checkbox" id="mode-toggle" aria-label="ENCODE / DECODE" />
         <span class="slider"></span>
       </label>
       <span class="toggle-label">DECODE</span>

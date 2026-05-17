@@ -37,7 +37,9 @@ function populateForm(s) {
 
   const enabledDecode = s.enabledDecodeFormats || ['wav', 'aiff'];
   document.querySelectorAll('.decode-toggle-btn').forEach((btn) => {
-    btn.classList.toggle('active', enabledDecode.includes(btn.dataset.fmt));
+    const active = enabledDecode.includes(btn.dataset.fmt);
+    btn.classList.toggle('active', active);
+    btn.setAttribute('aria-pressed', active ? 'true' : 'false');
   });
 
   document.getElementById('sourceAction').value = snakeCase(s.sourceFileAction) || 'keep';
@@ -77,7 +79,9 @@ function populateForm(s) {
 
   const enabled = s.enabledFormats || ['mp3', 'aac', 'flac'];
   document.querySelectorAll('#encode-fmt-group .fmt-toggle-btn').forEach((btn) => {
-    btn.classList.toggle('active', enabled.includes(btn.dataset.fmt));
+    const active = enabled.includes(btn.dataset.fmt);
+    btn.classList.toggle('active', active);
+    btn.setAttribute('aria-pressed', active ? 'true' : 'false');
   });
 
   document.getElementById('openInFinder').checked = s.openInFinder;
@@ -123,6 +127,7 @@ document.querySelectorAll('#encode-fmt-group .fmt-toggle-btn').forEach((btn) => 
     const activeCount = document.querySelectorAll('#encode-fmt-group .fmt-toggle-btn.active').length;
     if (btn.classList.contains('active') && activeCount <= 1) return;
     btn.classList.toggle('active');
+    btn.setAttribute('aria-pressed', btn.classList.contains('active') ? 'true' : 'false');
   });
 });
 
@@ -131,6 +136,7 @@ document.querySelectorAll('.decode-toggle-btn').forEach((btn) => {
     const activeCount = document.querySelectorAll('.decode-toggle-btn.active').length;
     if (btn.classList.contains('active') && activeCount <= 1) return;
     btn.classList.toggle('active');
+    btn.setAttribute('aria-pressed', btn.classList.contains('active') ? 'true' : 'false');
   });
 });
 
