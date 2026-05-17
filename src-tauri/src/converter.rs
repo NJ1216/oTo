@@ -510,6 +510,60 @@ fn build_codec_args(format: &str, settings: &Settings, info: &FileInfo) -> Vec<S
     }
 }
 
+// --- Silence detection for conditional trim ---
+
+/// Detect silence regions at the beginning and end of the file.
+/// Returns (has_start_silence, has_end_silence).
+fn detect_boundary_silence(path: &Path, db: f64, min_dur_secs: f64, total_duration: f64) -> (bool, bool) {
+    let ffmpeg = ffmpeg_path();
+    let filter = format!("silencedetect=noise={db}dB:duration={min_dur_secs:.4}");
+
+    let mut cmd = std::process::Command::new(&ffmpeg);
+    cmd.args(["-i", &path.to_string_lossy(), "-af", &filter, "-f", "null", "-"])
+       .stderr(std::process::Stdio::piped());
+    #[cfg(windows)]
+    { use std::os::windows::process::CommandExt; cmd.creation_flags(0x08000000); }
+
+    let out = match cmd.output() {
+        Ok(o) => o,
+        Err(_) => return (false, false),
+    };
+    let stderr = String::from_utf8_lossy(&out.stderr);
+
+    let mut all_regions: Vec<(f64, f64)> = Vec::new();
+    let mut cur_start: Option<f64> = None;
+
+    for line in stderr.lines() {
+        if let Some(pos) = line.find("silence_start:") {
+            if let Ok(t) = line[pos + 14..].trim().parse::<f64>() {
+                cur_start = Some(t.max(0.0));
+            }
+        } else if let Some(pos) = line.find("silence_end:") {
+            if let Some(start) = cur_start.take() {
+                let s = line[pos + 12..].split('|').next().unwrap_or("").trim();
+                if let Ok(end) = s.parse::<f64>() {
+                    all_regions.push((start, end));
+                }
+            }
+        }
+    }
+
+    // Handle silence that extends to the end of the file
+    if let Some(start) = cur_start {
+        all_regions.push((start, total_duration));
+    }
+
+    if all_regions.is_empty() {
+        return (false, false);
+    }
+
+    let tolerance = 0.05; // 50ms tolerance
+    let has_start = all_regions.iter().any(|(s, _)| *s <= tolerance);
+    let has_end = all_regions.iter().any(|(_, e)| (total_duration - *e).abs() <= tolerance);
+
+    (has_start, has_end)
+}
+
 // --- Single file conversion ---
 
 async fn convert_one(
@@ -572,18 +626,35 @@ async fn convert_one(
         args.push(format!("{}={}", k, v));
     }
 
-    // Silence trim (-af silenceremove)
+    // Silence trim (-af silenceremove) — only apply when silence actually exists
     let trim_enabled = settings.silence_trim_enabled;
     if trim_enabled {
         let dur = settings.silence_trim_duration_ms as f64 / 1000.0;
         let db  = settings.silence_trim_db;
-        args.extend([
-            "-af".into(),
-            format!(
-                "silenceremove=start_periods=1:start_silence={dur:.4}:start_threshold={db}dB\
-                 :stop_periods=-1:stop_silence={dur:.4}:stop_threshold={db}dB"
-            ),
-        ]);
+        let (has_start, has_end) = detect_boundary_silence(input, db, dur, info.duration_secs);
+
+        if has_start || has_end {
+            let start_part = if has_start {
+                format!("start_periods=1:start_silence={dur:.4}:start_threshold={db}dB")
+            } else {
+                String::new()
+            };
+            let stop_part = if has_end {
+                format!("stop_periods=-1:stop_silence={dur:.4}:stop_threshold={db}dB")
+            } else {
+                String::new()
+            };
+
+            let filter = if has_start && has_end {
+                format!("silenceremove={start_part}:{stop_part}")
+            } else if has_start {
+                format!("silenceremove={start_part}")
+            } else {
+                format!("silenceremove={stop_part}")
+            };
+
+            args.extend(["-af".into(), filter]);
+        }
     }
 
     args.extend(build_codec_args(format, settings, info));

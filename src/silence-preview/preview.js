@@ -362,10 +362,26 @@ function detectSilence(rmsValues, db, minDurationSecs) {
   }
 
   if (allRegions.length === 0) return [];
-  const result = [allRegions[0]];
-  if (allRegions.length > 1 && allRegions[allRegions.length - 1] !== allRegions[0]) {
-    result.push(allRegions[allRegions.length - 1]);
+
+  const tolerance = 0.05; // 50ms tolerance — match Rust logic
+  const result = [];
+
+  // Only treat as "start silence" if it begins near the very start
+  if (allRegions[0][0] <= tolerance) {
+    result.push(allRegions[0]);
   }
+
+  // Only treat as "end silence" if it ends near the very end
+  if (allRegions.length > 1) {
+    const last = allRegions[allRegions.length - 1];
+    if (Math.abs(totalDuration - last[1]) <= tolerance) {
+      // Avoid duplicating the same region
+      if (result.length === 0 || last !== result[0]) {
+        result.push(last);
+      }
+    }
+  }
+
   return result;
 }
 
