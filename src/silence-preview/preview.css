@@ -339,8 +339,19 @@ body {
 }
 
 .apply-btn {
-  background: #0369a1;
-  color: rgba(255, 255, 255, 0.95);
+  background: rgba(99, 102, 241, 0.85);
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  padding: 10px 28px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.apply-btn:hover {
+  background: rgba(99, 102, 241, 1);
 }
 
 .apply-btn:hover {

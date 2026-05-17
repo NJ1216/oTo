@@ -157,48 +157,54 @@ document.getElementById('language').addEventListener('change', (e) => {
   initI18n(e.target.value);
 });
 
-document.getElementById('save-btn').addEventListener('click', async () => {
-  const updated = {
-    ...settings,
-    outputDest: document.getElementById('outputDest').value || 'source_folder',
-    sourceFileAction: document.getElementById('sourceAction').value || 'keep',
-    nameConflict: document.getElementById('nameConflict').value || 'auto_rename',
-    mp3Preset: document.getElementById('mp3Preset').value,
-    mp3Mode: document.querySelector('input[name="mp3Mode"]:checked')?.value || 'cbr',
-    mp3Bitrate: parseInt(document.getElementById('mp3Bitrate').value, 10) || 192,
-    mp3VbrQuality: parseInt(document.getElementById('mp3VbrQuality').value, 10) || 4,
-    mp3SampleRate: parseInt(document.getElementById('mp3SampleRate').value, 10),
-    mp3ChannelMode: document.getElementById('mp3ChannelMode').value,
-    aacPreset: document.getElementById('aacPreset').value,
-    aacMode: document.querySelector('input[name="aacMode"]:checked')?.value || 'cbr',
-    m4aBitrate: parseInt(document.getElementById('m4aBitrate').value, 10) || 128,
-    aacVbrQuality: parseInt(document.getElementById('aacVbrQuality').value, 10) || 4,
-    aacSampleRate: parseInt(document.getElementById('aacSampleRate').value, 10),
-    aacChannels: parseInt(document.getElementById('aacChannels').value, 10),
-    opusPreset: document.getElementById('opusPreset').value,
-    opusMode: document.querySelector('input[name="opusMode"]:checked')?.value || 'vbr',
-    opusBitrate: parseInt(document.getElementById('opusBitrate').value, 10) || 128,
-    opusComplexity: parseInt(document.getElementById('opusComplexity').value, 10),
-    flacPreset: document.getElementById('flacPreset').value,
-    flacCompression: parseInt(document.getElementById('flacCompression').value, 10),
-    alacPreset: document.getElementById('alacPreset').value,
-    alacBitDepth: parseInt(document.getElementById('alacBitDepth').value, 10) || 16,
-    silenceTrimEnabled: document.getElementById('silenceTrimEnabled').checked,
-    openInFinder: document.getElementById('openInFinder').checked,
-    preserveFolderStructure: document.getElementById('preserveFolderStructure').checked,
+function collectFormValues() {
+  const int = (id, fallback = 0) => parseInt(document.getElementById(id)?.value, 10) || fallback;
+  const str = (id, fallback = '') => document.getElementById(id)?.value || fallback;
+  const chk = (id) => !!document.getElementById(id)?.checked;
+  const radio = (name, fallback) => document.querySelector(`input[name="${name}"]:checked`)?.value || fallback;
+
+  return {
+    outputDest: str('outputDest', 'source_folder'),
+    sourceFileAction: str('sourceAction', 'keep'),
+    nameConflict: str('nameConflict', 'auto_rename'),
+    mp3Preset: str('mp3Preset'),
+    mp3Mode: radio('mp3Mode', 'cbr'),
+    mp3Bitrate: int('mp3Bitrate', 192),
+    mp3VbrQuality: int('mp3VbrQuality', 4),
+    mp3SampleRate: int('mp3SampleRate'),
+    mp3ChannelMode: str('mp3ChannelMode'),
+    aacPreset: str('aacPreset'),
+    aacMode: radio('aacMode', 'cbr'),
+    m4aBitrate: int('m4aBitrate', 128),
+    aacVbrQuality: int('aacVbrQuality', 4),
+    aacSampleRate: int('aacSampleRate'),
+    aacChannels: int('aacChannels'),
+    opusPreset: str('opusPreset'),
+    opusMode: radio('opusMode', 'vbr'),
+    opusBitrate: int('opusBitrate', 128),
+    opusComplexity: int('opusComplexity'),
+    flacPreset: str('flacPreset'),
+    flacCompression: int('flacCompression'),
+    alacPreset: str('alacPreset'),
+    alacBitDepth: int('alacBitDepth', 16),
+    silenceTrimEnabled: chk('silenceTrimEnabled'),
+    openInFinder: chk('openInFinder'),
+    preserveFolderStructure: chk('preserveFolderStructure'),
     customOutputPath: customPath,
-    language: document.getElementById('language').value,
+    language: str('language'),
     enabledFormats: (() => {
-      const checked = [...document.querySelectorAll('#encode-fmt-group .fmt-toggle-btn.active')].map((btn) => btn.dataset.fmt);
+      const checked = [...document.querySelectorAll('#encode-fmt-group .fmt-toggle-btn.active')].map((b) => b.dataset.fmt);
       return checked.length > 0 ? checked : ['mp3'];
     })(),
     enabledDecodeFormats: (() => {
-      const checked = [...document.querySelectorAll('.decode-toggle-btn.active')].map((btn) => btn.dataset.fmt);
+      const checked = [...document.querySelectorAll('.decode-toggle-btn.active')].map((b) => b.dataset.fmt);
       return checked.length > 0 ? checked : ['wav'];
     })(),
   };
+}
 
-  await invoke('save_settings', { s: updated });
+document.getElementById('save-btn').addEventListener('click', async () => {
+  await invoke('save_settings', { s: { ...settings, ...collectFormValues() } });
   await emit('settings_updated');
   await getCurrentWebviewWindow().close();
 });

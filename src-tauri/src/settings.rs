@@ -175,13 +175,13 @@ impl Default for Settings {
             opus_bitrate: default_opus_bitrate(),
             opus_complexity: default_opus_complexity(),
             flac_preset: default_flac_preset(),
-            flac_compression: 5,
+            flac_compression: default_flac_compression(),
             alac_preset: String::new(),
             alac_bit_depth: default_alac_bit_depth(),
             parallel_count: calc_parallel_count(),
             open_in_finder: false,
-            last_mode: "encode".into(),
-            last_format: "mp3".into(),
+            last_mode: default_last_mode(),
+            last_format: default_last_format(),
             last_decode_format: default_last_decode_format(),
             custom_output_path: None,
             preserve_folder_structure: false,
@@ -195,6 +195,100 @@ impl Default for Settings {
     }
 }
 
+impl Settings {
+    /// Validate and clamp all numeric/range fields to safe values.
+    /// Called after loading or before saving to prevent malformed settings
+    /// from reaching FFmpeg.
+    pub fn validate(&mut self) {
+        // MP3
+        self.mp3_bitrate = self.mp3_bitrate.clamp(32, 320);
+        self.mp3_vbr_quality = self.mp3_vbr_quality.clamp(0, 9);
+        self.mp3_sample_rate = match self.mp3_sample_rate {
+            0 | 44100 | 48000 | 88200 | 96000 => self.mp3_sample_rate,
+            _ => 0,
+        };
+        if !matches!(self.mp3_mode.as_str(), "cbr" | "vbr") {
+            self.mp3_mode = "cbr".into();
+        }
+        if !matches!(self.mp3_channel_mode.as_str(), "auto" | "joint_stereo" | "stereo" | "mono") {
+            self.mp3_channel_mode = "joint_stereo".into();
+        }
+        if let Ok(v) = self.mp3_preset.parse::<u32>() {
+            if !(128..=320).contains(&v) && v != 0 {
+                self.mp3_preset = "192".into();
+            }
+        } else if self.mp3_preset != "custom" {
+            self.mp3_preset = "192".into();
+        }
+
+        // AAC
+        self.m4a_bitrate = self.m4a_bitrate.clamp(32, 320);
+        self.aac_vbr_quality = self.aac_vbr_quality.clamp(1, 5);
+        self.aac_sample_rate = match self.aac_sample_rate {
+            0 | 44100 | 48000 => self.aac_sample_rate,
+            _ => 0,
+        };
+        self.aac_channels = self.aac_channels.clamp(0, 2);
+        if !matches!(self.aac_mode.as_str(), "cbr" | "vbr") {
+            self.aac_mode = "cbr".into();
+        }
+        if let Ok(v) = self.aac_preset.parse::<u32>() {
+            if !(64..=256).contains(&v) && v != 0 {
+                self.aac_preset = "128".into();
+            }
+        } else if self.aac_preset != "custom" {
+            self.aac_preset = "128".into();
+        }
+
+        // OPUS
+        self.opus_bitrate = self.opus_bitrate.clamp(16, 320);
+        self.opus_complexity = self.opus_complexity.clamp(0, 10);
+        if !matches!(self.opus_mode.as_str(), "cbr" | "vbr") {
+            self.opus_mode = "vbr".into();
+        }
+        if let Ok(v) = self.opus_preset.parse::<u32>() {
+            if !(16..=320).contains(&v) && v != 0 {
+                self.opus_preset = "128".into();
+            }
+        } else if self.opus_preset != "custom" {
+            self.opus_preset = "128".into();
+        }
+
+        // FLAC
+        self.flac_compression = self.flac_compression.clamp(0, 8);
+        if let Ok(v) = self.flac_preset.parse::<u32>() {
+            if v > 8 {
+                self.flac_preset = "5".into();
+            }
+        } else if self.flac_preset != "custom" {
+            self.flac_preset = "5".into();
+        }
+
+        // ALAC
+        self.alac_bit_depth = match self.alac_bit_depth {
+            16 | 24 => self.alac_bit_depth,
+            _ => 16,
+        };
+
+        // Silence trim
+        self.silence_trim_db = self.silence_trim_db.clamp(-100.0, 0.0);
+        self.silence_trim_duration_ms = self.silence_trim_duration_ms.clamp(1, 10000);
+
+        // Enabled formats: ensure at least one
+        if self.enabled_formats.is_empty() {
+            self.enabled_formats = vec!["mp3".into()];
+        }
+        if self.enabled_decode_formats.is_empty() {
+            self.enabled_decode_formats = vec!["wav".into()];
+        }
+
+        // Last mode / format
+        if !matches!(self.last_mode.as_str(), "encode" | "decode") {
+            self.last_mode = "encode".into();
+        }
+    }
+}
+
 fn settings_path(app: &AppHandle) -> Result<PathBuf> {
     let config_dir = app.path().app_config_dir()?;
     std::fs::create_dir_all(&config_dir)?;
@@ -204,20 +298,25 @@ fn settings_path(app: &AppHandle) -> Result<PathBuf> {
 pub fn load_settings(app: &AppHandle) -> Result<Settings> {
     let path = settings_path(app)?;
     if !path.exists() {
-        return Ok(Settings::default());
+        let mut s = Settings::default();
+        s.validate();
+        return Ok(s);
     }
     let data = std::fs::read_to_string(&path)?;
     let mut settings: Settings = serde_json::from_str(&data).unwrap_or_else(|e| {
         eprintln!("Failed to parse settings.json: {e}");
         Settings::default()
     });
+    settings.validate();
     settings.parallel_count = calc_parallel_count();
     Ok(settings)
 }
 
 pub fn save_settings(app: &AppHandle, settings: &Settings) -> Result<()> {
     let path = settings_path(app)?;
-    let data = serde_json::to_string_pretty(settings)?;
+    let mut validated = settings.clone();
+    validated.validate();
+    let data = serde_json::to_string_pretty(&validated)?;
     std::fs::write(&path, data)?;
     Ok(())
 }

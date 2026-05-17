@@ -5,6 +5,7 @@
   "windows": ["main", "settings", "about"],
   "permissions": [
     "core:default",
+    "core:path:default",
     "core:event:allow-listen",
     "core:event:allow-unlisten",
     "core:event:allow-emit",

@@ -4,6 +4,7 @@
   "version": "26.5.16",
   "identifier": "com.NJ1216.oto",
   "build": {
+    "beforeDevCommand": "pnpm dev",
     "frontendDist": "../dist",
     "devUrl": "http://localhost:1420"
   },
@@ -18,20 +19,10 @@
         "resizable": false,
         "center": true,
         "dragDropEnabled": true
-      },
-      {
-        "label": "silence-preview",
-        "url": "silence-preview/preview.html",
-        "title": "無音トリミング - 詳細設定",
-        "width": 820,
-        "height": 560,
-        "resizable": true,
-        "visible": false,
-        "dragDropEnabled": true
       }
     ],
     "security": {
-      "csp": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; media-src 'self' blob:; connect-src ipc: https://ipc.localhost 'self'"
+      "csp": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; media-src 'self' asset: blob:; connect-src ipc: https://ipc.localhost 'self'"
     }
   },
   "bundle": {

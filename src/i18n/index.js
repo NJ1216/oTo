@@ -4,7 +4,7 @@ let _dict = {};
 function resolve(lang) {
   if (lang && SUPPORTED.includes(lang)) return lang;
   const sys = (navigator.language || '').split('-')[0].toLowerCase();
-  return SUPPORTED.includes(sys) ? sys : 'en';
+  return SUPPORTED.includes(sys) ? sys : 'ja';
 }
 
 export function t(key, vars = {}) {

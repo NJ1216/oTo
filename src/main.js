@@ -5,6 +5,8 @@ import { getCurrentWebviewWindow } from '@tauri-apps/api/webviewWindow';
 import { initSVGController, setState, setFormat, setMode, setProgress } from './svg-controller.js';
 import { initI18n, t } from './i18n/index.js';
 
+const appWindow = getCurrentWebviewWindow();
+
 // --- State ---
 let appSettings = null;
 let currentMode = 'encode';
@@ -79,6 +81,18 @@ async function init() {
     appSettings = await invoke('get_settings');
     await initI18n(appSettings.language || '');
     applyModeToUI();
+  });
+
+  await listen('silence_preview_opened', () => { silencePreviewVisible = true; });
+  await listen('silence_preview_closed', () => { silencePreviewVisible = false; });
+
+  appWindow.onCloseRequested(async (event) => {
+    if (isProcessing) {
+      const confirmed = confirm(t('dialog.closeConfirm') || '変換中です。本当にキャンセルして閉じますか？');
+      if (!confirmed) {
+        event.preventDefault();
+      }
+    }
   });
 }
 
@@ -164,6 +178,10 @@ document.querySelectorAll('.decode-fmt-btn').forEach((btn) => {
 });
 
 // --- Drag & Drop via Tauri events ---
+// drag-enter でキャッシュして drag-over/drag-leave の高頻度 IPC を削減。
+// drag-drop は信頼性のため毎回 IPC で確認する。
+let silencePreviewVisible = false;
+
 function setDragHover(hovered) {
   if (isProcessing) return;
   isDragging = hovered;
@@ -171,27 +189,23 @@ function setDragHover(hovered) {
 }
 
 function registerDragDrop() {
-  listen('tauri://drag-enter', async () => {
-    const visible = await invoke('is_silence_preview_visible');
-    if (visible) return;
+  listen('tauri://drag-enter', () => {
+    if (silencePreviewVisible) return;
     setDragHover(true);
   });
 
-  listen('tauri://drag-over', async () => {
-    const visible = await invoke('is_silence_preview_visible');
-    if (visible) return;
+  listen('tauri://drag-over', () => {
+    if (silencePreviewVisible) return;
     if (!isDragging) setDragHover(true);
   });
 
-  listen('tauri://drag-leave', async () => {
-    const visible = await invoke('is_silence_preview_visible');
-    if (visible) return;
+  listen('tauri://drag-leave', () => {
+    if (silencePreviewVisible) return;
     setDragHover(false);
   });
 
-  listen('tauri://drag-drop', async (event) => {
-    const visible = await invoke('is_silence_preview_visible');
-    if (visible) return;
+  listen('tauri://drag-drop', (event) => {
+    if (silencePreviewVisible) return;
     isDragging = false;
     if (isProcessing) return;
 

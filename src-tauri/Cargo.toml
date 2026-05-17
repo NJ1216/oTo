@@ -14,18 +14,19 @@ name = "oto"
 path = "src/main.rs"
 
 [build-dependencies]
-tauri-build = { version = "2", features = [] }
+tauri-build = { version = "2.6", features = [] }
 
 [dependencies]
-tauri = { version = "2", features = [] }
-tauri-plugin-dialog = "2"
-serde = { version = "1", features = ["derive"] }
-serde_json = "1"
-tokio = { version = "1", features = ["full"] }
-walkdir = "2"
-anyhow = "1"
-dirs = "5"
+tauri = { version = "2.11", features = [] }
+tauri-plugin-dialog = "2.7"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+tokio = { version = "1.52", features = ["sync", "rt-multi-thread", "process", "io-util", "time", "fs"] }
+walkdir = "2.5"
+anyhow = "1.0"
+dirs = "6.0"
 base64 = "0.22"
+uuid = { version = "1.23", features = ["v4"] }
 
 [target.'cfg(unix)'.dependencies]
 libc = "0.2"

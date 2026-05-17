@@ -2,7 +2,7 @@ use serde::Serialize;
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
-use tauri::{AppHandle, Manager, State, WebviewUrl, WebviewWindowBuilder};
+use tauri::{AppHandle, Emitter, Manager, State, WebviewUrl};
 use tokio::sync::Mutex;
 
 mod converter;
@@ -19,6 +19,7 @@ pub struct JobInfo {
 
 pub struct AppState {
     pub jobs: Mutex<HashMap<String, JobInfo>>,
+    pub is_converting: AtomicBool,
 }
 
 // --- Commands ---
@@ -33,6 +34,7 @@ async fn convert_files(
     let current_settings = settings::load_settings(&app).map_err(|e| e.to_string())?;
     let pgids: Arc<Mutex<Vec<i32>>> = Arc::new(Mutex::new(vec![]));
 
+    state.is_converting.store(true, Ordering::SeqCst);
     let job_id_clone = job_id.clone();
     let app_clone = app.clone();
     let app_for_cleanup = app.clone();
@@ -42,6 +44,7 @@ async fn convert_files(
     let handle = tokio::spawn(async move {
         run_conversion(app_clone, job_id_clone, request, current_settings, pgids_for_conv).await;
         app_for_cleanup.state::<AppState>().jobs.lock().await.remove(&job_id_for_cleanup);
+        app_for_cleanup.state::<AppState>().is_converting.store(false, Ordering::SeqCst);
     });
 
     state.jobs.lock().await.insert(job_id.clone(), JobInfo { handle, pgids, paused: AtomicBool::new(false) });
@@ -174,36 +177,46 @@ async fn save_settings(app: AppHandle, s: Settings) -> Result<(), String> {
     settings::save_settings(&app, &s).map_err(|e| e.to_string())
 }
 
-#[tauri::command]
-async fn open_settings_window(app: AppHandle) -> Result<(), String> {
-    if let Some(win) = app.get_webview_window("settings") {
+/// Helper to create a dev-mode URL for a given relative path.
+#[cfg(dev)]
+fn dev_url(path: &str) -> WebviewUrl {
+    WebviewUrl::External(format!("http://localhost:1420/src/{}", path).parse().unwrap())
+}
+
+/// Helper to create a prod-mode URL for a given relative path.
+#[cfg(not(dev))]
+fn dev_url(path: &str) -> WebviewUrl {
+    WebviewUrl::App(path.into())
+}
+
+async fn ensure_window(
+    app: &AppHandle,
+    label: &str,
+    url: WebviewUrl,
+    title: &str,
+    width: f64,
+    height: f64,
+    resizable: bool,
+) -> Result<(), String> {
+    if let Some(win) = app.get_webview_window(label) {
         win.show().map_err(|e| e.to_string())?;
         win.set_focus().map_err(|e| e.to_string())?;
     } else {
-        WebviewWindowBuilder::new(&app, "settings", WebviewUrl::App("settings/settings.html".into()))
-            .title("oTo - Settings")
-            .inner_size(480.0, 560.0)
-            .resizable(false)
-            .build()
-            .map_err(|e: tauri::Error| e.to_string())?;
+        tauri::WebviewWindowBuilder::new(app, label, url)
+            .title(title).inner_size(width, height).resizable(resizable)
+            .build().map_err(|e: tauri::Error| e.to_string())?;
     }
     Ok(())
 }
 
 #[tauri::command]
+async fn open_settings_window(app: AppHandle) -> Result<(), String> {
+    ensure_window(&app, "settings", dev_url("settings/settings.html"), "oTo - Settings", 480.0, 560.0, false).await
+}
+
+#[tauri::command]
 async fn open_about_window(app: AppHandle) -> Result<(), String> {
-    if let Some(win) = app.get_webview_window("about") {
-        win.show().map_err(|e| e.to_string())?;
-        win.set_focus().map_err(|e| e.to_string())?;
-    } else {
-        WebviewWindowBuilder::new(&app, "about", WebviewUrl::App("about/about.html".into()))
-            .title("oTo - About")
-            .inner_size(400.0, 460.0)
-            .resizable(false)
-            .build()
-            .map_err(|e: tauri::Error| e.to_string())?;
-    }
-    Ok(())
+    ensure_window(&app, "about", dev_url("about/about.html"), "oTo - About", 400.0, 460.0, false).await
 }
 
 #[tauri::command]
@@ -239,44 +252,28 @@ struct WaveformData {
     duration_secs: f64,
 }
 
-fn compute_peaks_and_rms(samples: &[f32], num_buckets: usize) -> (Vec<(f32, f32)>, Vec<f32>) {
-    if samples.is_empty() { return (vec![], vec![]); }
-    let num_buckets = num_buckets.min(samples.len());
-    let mut peaks = Vec::with_capacity(num_buckets);
-    let mut rms = Vec::with_capacity(num_buckets);
-    for i in 0..num_buckets {
-        let start = (i * samples.len()) / num_buckets;
-        let end = ((i + 1) * samples.len()) / num_buckets;
-        let end = end.min(samples.len());
-        if start >= end {
-            let v = samples[start.min(samples.len() - 1)];
-            peaks.push((v, v));
-            rms.push(v.abs());
-            continue;
-        }
-        let chunk = &samples[start..end];
-        let mn = chunk.iter().cloned().fold(f32::INFINITY, f32::min).max(-1.0).min(1.0);
-        let mx = chunk.iter().cloned().fold(f32::NEG_INFINITY, f32::max).max(-1.0).min(1.0);
-        let rms_val = (chunk.iter().map(|s| s * s).sum::<f32>() / chunk.len() as f32).sqrt();
-        peaks.push((mn, mx));
-        rms.push(rms_val);
-    }
-    (peaks, rms)
-}
 
 #[tauri::command]
 async fn open_silence_preview(app: AppHandle) -> Result<(), String> {
-    if let Some(win) = app.get_webview_window("silence-preview") {
+    let label = "silence-preview";
+    if let Some(win) = app.get_webview_window(label) {
         win.show().map_err(|e| e.to_string())?;
         win.set_focus().map_err(|e| e.to_string())?;
     } else {
-        WebviewWindowBuilder::new(&app, "silence-preview", WebviewUrl::App("silence-preview/preview.html".into()))
+        let win = tauri::WebviewWindowBuilder::new(&app, label, dev_url("silence-preview/preview.html"))
             .title("無音トリミング - 詳細設定")
             .inner_size(820.0, 560.0)
             .resizable(true)
             .build()
             .map_err(|e: tauri::Error| e.to_string())?;
+        let app_handle = app.clone();
+        win.on_window_event(move |event| {
+            if matches!(event, tauri::WindowEvent::Destroyed) {
+                app_handle.emit("silence_preview_closed", ()).ok();
+            }
+        });
     }
+    app.emit("silence_preview_opened", ()).ok();
     Ok(())
 }
 
@@ -289,39 +286,82 @@ async fn is_silence_preview_visible(app: AppHandle) -> bool {
     }
 }
 
+fn compute_waveform_streaming(path: &std::path::Path, num_samples: usize, resolutions: &[usize]) -> Vec<WaveformLevel> {
+    use std::io::Read;
+    type Acc = (f32, f32, f32, u32);
+    let mut accs: Vec<Vec<Acc>> = resolutions.iter()
+        .map(|&res| vec![(f32::INFINITY, f32::NEG_INFINITY, 0.0, 0); res])
+        .collect();
+
+    if let Ok(file) = std::fs::File::open(path) {
+        let mut reader = std::io::BufReader::with_capacity(262144, file);
+        let mut buf = [0u8; 4];
+        let mut idx = 0usize;
+        while reader.read_exact(&mut buf).is_ok() {
+            let s = f32::from_le_bytes(buf);
+            for (ri, &res) in resolutions.iter().enumerate() {
+                let bucket = (idx * res) / num_samples;
+                if bucket < res {
+                    let a = &mut accs[ri][bucket];
+                    if s < a.0 { a.0 = s; }
+                    if s > a.1 { a.1 = s; }
+                    a.2 += s * s;
+                    a.3 += 1;
+                }
+            }
+            idx += 1;
+        }
+    }
+
+    accs.into_iter().map(|res_acc| {
+        let mut peaks = Vec::with_capacity(res_acc.len());
+        let mut rms   = Vec::with_capacity(res_acc.len());
+        for (mn, mx, sum_sq, count) in res_acc {
+            if count == 0 {
+                peaks.push((0.0_f32, 0.0_f32));
+                rms.push(0.0_f32);
+            } else {
+                peaks.push((mn.max(-1.0).min(1.0), mx.max(-1.0).min(1.0)));
+                rms.push((sum_sq / count as f32).sqrt());
+            }
+        }
+        WaveformLevel { peaks, rms }
+    }).collect()
+}
+
 #[tauri::command]
 async fn get_waveform_data(path: String) -> Result<WaveformData, String> {
     tokio::task::spawn_blocking(move || {
         let ffmpeg = converter::ffmpeg_path();
 
+        let uuid = uuid::Uuid::new_v4();
         let mut temp = std::env::temp_dir();
-        temp.push(format!("oto_wave_multi_{}.raw", std::process::id()));
+        temp.push(format!("oto_wave_{}.raw", uuid));
 
         let mut cmd = std::process::Command::new(&ffmpeg);
         cmd.args(["-y", "-i", &path, "-ar", "4000", "-f", "f32le", "-ac", "1",
                    &temp.to_string_lossy().into_owned()]);
         #[cfg(windows)]
         { use std::os::windows::process::CommandExt; cmd.creation_flags(0x08000000); }
-        cmd.stderr(std::process::Stdio::null());
-        cmd.output().map_err(|e| e.to_string())?;
+        cmd.stderr(std::process::Stdio::piped());
+        let output = cmd.output().map_err(|e| e.to_string())?;
+        if !output.status.success() {
+            let _ = std::fs::remove_file(&temp);
+            let stderr = String::from_utf8_lossy(&output.stderr);
+            return Err(format!("ffmpeg failed: {}", stderr.lines().last().unwrap_or("unknown error")));
+        }
 
-        let raw = std::fs::read(&temp).map_err(|_| "decode failed".to_string())?;
+        let file_size = std::fs::metadata(&temp).map_err(|e| e.to_string())?.len() as usize;
+        if file_size < 8 {
+            let _ = std::fs::remove_file(&temp);
+            return Err("no audio data".to_string());
+        }
+        let num_samples = file_size / 4;
+        let duration_secs = num_samples as f64 / 4000.0;
+
+        let resolutions = [800_usize, 8000, 80000];
+        let levels = compute_waveform_streaming(&temp, num_samples, &resolutions);
         let _ = std::fs::remove_file(&temp);
-        if raw.len() < 8 { return Err("no audio data".to_string()); }
-
-        let samples: Vec<f32> = raw.chunks_exact(4)
-            .map(|b| f32::from_le_bytes(b.try_into().unwrap()))
-            .collect();
-
-        let duration_secs = samples.len() as f64 / 4000.0;
-
-        let resolutions = [800, 8000, 80000];
-        let levels: Vec<WaveformLevel> = resolutions.iter()
-            .map(|&res| {
-                let (peaks, rms) = compute_peaks_and_rms(&samples, res);
-                WaveformLevel { peaks, rms }
-            })
-            .collect();
 
         Ok(WaveformData { levels, duration_secs })
     }).await.map_err(|e| e.to_string())?
@@ -331,64 +371,48 @@ async fn get_waveform_data(path: String) -> Result<WaveformData, String> {
 async fn decode_to_wav(path: String) -> Result<String, String> {
     tokio::task::spawn_blocking(move || {
         let ffmpeg = converter::ffmpeg_path();
+        let uuid = uuid::Uuid::new_v4();
         let mut temp = std::env::temp_dir();
-        temp.push(format!("oto_preview_{}.wav", std::process::id()));
+        temp.push(format!("oto_preview_{}.wav", uuid));
         let temp_path = temp.to_string_lossy().into_owned();
 
         let mut cmd = std::process::Command::new(&ffmpeg);
         cmd.args(["-y", "-i", &path, "-ar", "44100", "-ac", "2", "-f", "wav", &temp_path]);
         #[cfg(windows)]
         { use std::os::windows::process::CommandExt; cmd.creation_flags(0x08000000); }
-        cmd.stderr(std::process::Stdio::null());
+        cmd.stderr(std::process::Stdio::piped());
         let output = cmd.output().map_err(|e| e.to_string())?;
         if !output.status.success() {
-            return Err("decode to wav failed".to_string());
+            let _ = std::fs::remove_file(&temp);
+            let stderr = String::from_utf8_lossy(&output.stderr);
+            return Err(format!("decode to wav failed: {}", stderr.lines().last().unwrap_or("unknown error")));
         }
 
-        let wav_bytes = std::fs::read(&temp).map_err(|e| e.to_string())?;
-        let _ = std::fs::remove_file(&temp);
-
-        use base64::{Engine as _, engine::general_purpose::STANDARD};
-        Ok(STANDARD.encode(&wav_bytes))
+        // Return path; caller uses convertFileSrc() and is responsible for cleanup
+        Ok(temp_path)
     }).await.map_err(|e| e.to_string())?
+}
+
+#[tauri::command]
+async fn delete_temp_wav(path: String) -> Result<(), String> {
+    let p = std::path::Path::new(&path);
+    let temp_dir = std::env::temp_dir();
+    let name = p.file_name().unwrap_or_default().to_string_lossy();
+    if !p.starts_with(&temp_dir) || !name.starts_with("oto_preview_") || !name.ends_with(".wav") {
+        return Err("invalid path".to_string());
+    }
+    tokio::fs::remove_file(&path).await.map_err(|e| e.to_string())
 }
 
 #[tauri::command]
 async fn get_silence_regions(path: String, db: f64, duration_ms: u32) -> Result<Vec<(f64, f64)>, String> {
     tokio::task::spawn_blocking(move || {
-        let ffmpeg = converter::ffmpeg_path();
         let dur_secs = duration_ms as f64 / 1000.0;
-        let filter = format!("silencedetect=noise={db}dB:duration={dur_secs:.4}");
-
-        let mut cmd = std::process::Command::new(&ffmpeg);
-        cmd.args(["-i", &path, "-af", &filter, "-f", "null", "-"])
-           .stderr(std::process::Stdio::piped());
-        #[cfg(windows)]
-        { use std::os::windows::process::CommandExt; cmd.creation_flags(0x08000000); }
-
-        let out = cmd.output().map_err(|e| e.to_string())?;
-        let stderr = String::from_utf8_lossy(&out.stderr);
-
-        // Collect all silence regions first
-        let mut all_regions: Vec<(f64, f64)> = Vec::new();
-        let mut cur_start: Option<f64> = None;
-        for line in stderr.lines() {
-            if let Some(pos) = line.find("silence_start:") {
-                if let Ok(t) = line[pos + 14..].trim().parse::<f64>() {
-                    cur_start = Some(t.max(0.0));
-                }
-            } else if let Some(pos) = line.find("silence_end:") {
-                if let Some(start) = cur_start.take() {
-                    let s = line[pos + 12..].split('|').next().unwrap_or("").trim();
-                    if let Ok(end) = s.parse::<f64>() {
-                        all_regions.push((start, end));
-                    }
-                }
-            }
-        }
+        let all_regions = converter::run_silence_detect(
+            std::path::Path::new(&path), db, dur_secs,
+        );
 
         // Only return the first (beginning) and last (end) silence regions
-        // for the trim feature that removes start/end silence only
         if all_regions.is_empty() {
             return Ok(Vec::new());
         }
@@ -397,7 +421,6 @@ async fn get_silence_regions(path: String, db: f64, duration_ms: u32) -> Result<
         result.push(all_regions[0]);
         if all_regions.len() > 1 {
             let last = all_regions[all_regions.len() - 1];
-            // Only add the last region if it's different from the first
             if last != all_regions[0] {
                 result.push(last);
             }
@@ -424,6 +447,7 @@ fn open_url(url: String) -> Result<(), String> {
 pub fn run() {
     let state = AppState {
         jobs: Mutex::new(HashMap::new()),
+        is_converting: AtomicBool::new(false),
     };
 
     tauri::Builder::default()
@@ -445,6 +469,7 @@ pub fn run() {
             is_silence_preview_visible,
             get_waveform_data,
             decode_to_wav,
+                delete_temp_wav,
             get_silence_regions,
         ])
         .setup(|app| {
@@ -481,20 +506,7 @@ pub fn run() {
             if event.id().as_ref() == "open_about" {
                 let app = app.clone();
                 tauri::async_runtime::spawn(async move {
-                    if let Some(win) = app.get_webview_window("about") {
-                        let _ = win.show();
-                        let _ = win.set_focus();
-                    } else {
-                        let _ = WebviewWindowBuilder::new(
-                            &app,
-                            "about",
-                            tauri::WebviewUrl::App("about/about.html".into()),
-                        )
-                        .title("oTo - About")
-                        .inner_size(400.0, 460.0)
-                        .resizable(false)
-                        .build();
-                    }
+                    let _ = ensure_window(&app, "about", dev_url("about/about.html"), "oTo - About", 400.0, 460.0, false).await;
                 });
             }
         })

@@ -1,6 +1,6 @@
 import { initI18n, t } from '../i18n/index.js';
 
-import { invoke } from '@tauri-apps/api/core';
+import { invoke, convertFileSrc } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
 import { getCurrentWebviewWindow } from '@tauri-apps/api/webviewWindow';
 
@@ -49,6 +49,7 @@ let midScrollStartViewEnd   = 0;
 // --- Playback state ---
 let audioElement = null;
 let decodedWavPath = null;
+let currentWavTempPath = null;
 let isPlaying = false;
 let playbackMode = null;
 let volume = 1.0;
@@ -73,8 +74,8 @@ async function init() {
 
 function applyI18n() {
   const win = getCurrentWebviewWindow();
-  win.setTitle(t('settings.silencePreview.title'));
-  document.title = t('settings.silencePreview.title');
+  win.setTitle(t('silencePreview.title'));
+  document.title = t('silencePreview.title');
   dropHint.textContent = t('silencePreview.drop');
   document.getElementById('legend-silence').textContent = t('silencePreview.silenceLabel');
   document.getElementById('legend-keep').textContent    = t('silencePreview.keepLabel');
@@ -126,7 +127,11 @@ listen('tauri://drag-drop', async (event) => {
   await loadFile(path, name);
 });
 
+let loadGeneration = 0;
+
 async function loadFile(path, name) {
+  const gen = ++loadGeneration;
+
   currentPath    = path;
   waveformLevels = [];
   silenceRegions = [];
@@ -142,16 +147,18 @@ async function loadFile(path, name) {
   statusEl.textContent = t('silencePreview.loadingWaveform');
 
   stopPlayback();
-  if (decodedWavPath) {
-    URL.revokeObjectURL(decodedWavPath);
-    decodedWavPath = null;
+  if (currentWavTempPath) {
+    invoke('delete_temp_wav', { path: currentWavTempPath }).catch(() => {});
+    currentWavTempPath = null;
   }
+  decodedWavPath = null;
   firstSilenceEnd = 0;
   lastSilenceStart = 0;
   playbackProgress = 0;
 
   try {
     const data = await invoke('get_waveform_data', { path });
+    if (gen !== loadGeneration) return; // 別ファイルのロードが開始された
     waveformLevels = data.levels;
     totalDuration = data.durationSecs;
     fileDurEl.textContent = formatDuration(totalDuration);
@@ -160,18 +167,18 @@ async function loadFile(path, name) {
     scheduleAnalyze();
 
     try {
-      const wavBase64 = await invoke('decode_to_wav', { path });
-      const binaryString = atob(wavBase64);
-      const bytes = new Uint8Array(binaryString.length);
-      for (let i = 0; i < binaryString.length; i++) {
-        bytes[i] = binaryString.charCodeAt(i);
+      const wavPath = await invoke('decode_to_wav', { path });
+      if (gen !== loadGeneration) {
+        invoke('delete_temp_wav', { path: wavPath }).catch(() => {});
+        return;
       }
-      const blob = new Blob([bytes], { type: 'audio/wav' });
-      decodedWavPath = URL.createObjectURL(blob);
+      currentWavTempPath = wavPath;
+      decodedWavPath = convertFileSrc(wavPath);
     } catch (e) {
       console.error('WAV decode failed:', e);
     }
   } catch (err) {
+    if (gen !== loadGeneration) return;
     statusEl.textContent = t('silencePreview.error', { msg: err });
   }
 }
@@ -241,6 +248,18 @@ function drawChannel(ctx, peaks, startIdx, endIdx, regions, canvasW, canvasH, vS
   const barW = 1;
   const bucketSize = visibleCount / canvasW;
 
+  // Pre-compute which pixels fall inside silence regions (O(regions) not O(canvasW*regions))
+  const silencePixels = new Uint8Array(canvasW);
+  if (regions.length > 0 && totalDuration > 0 && viewEnd > viewStart) {
+    const invScale = canvasW / ((viewEnd - viewStart) * totalDuration);
+    const viewOffsetTime = viewStart * totalDuration;
+    for (const [s, e] of regions) {
+      const pxStart = Math.max(0, Math.floor((s - viewOffsetTime) * invScale));
+      const pxEnd = Math.min(canvasW, Math.ceil((e - viewOffsetTime) * invScale));
+      for (let px = pxStart; px < pxEnd; px++) silencePixels[px] = 1;
+    }
+  }
+
   for (let px = 0; px < canvasW; px++) {
     const bStart = startIdx + Math.floor(px * bucketSize);
     const bEnd   = startIdx + Math.floor((px + 1) * bucketSize);
@@ -251,17 +270,13 @@ function drawChannel(ctx, peaks, startIdx, endIdx, regions, canvasW, canvasH, vS
       if (vMx > mx) mx = vMx;
     }
 
-    const x = px;
     const y1 = midY - Math.min(mx * scaleY, canvasH / 2);
     const y2 = midY - Math.max(mn * scaleY, -canvasH / 2);
 
-    const tPos = (viewStart + (px / canvasW) * (viewEnd - viewStart)) * totalDuration;
-    const inSilence = regions.some(([s, e]) => tPos >= s && tPos <= e);
-
-    ctx.fillStyle = inSilence
+    ctx.fillStyle = silencePixels[px]
       ? 'rgba(239, 68, 68, 0.6)'
       : 'rgba(99, 102, 241, 0.7)';
-    ctx.fillRect(x, y1, barW, Math.max(y2 - y1, 1));
+    ctx.fillRect(px, y1, barW, Math.max(y2 - y1, 1));
   }
 
   ctx.strokeStyle = 'rgba(255, 255, 255, 0.07)';
@@ -553,15 +568,14 @@ document.addEventListener('keydown', (e) => {
     return;
   }
 
-  const key = e.key.toLowerCase();
-  if (key === 'g' && !e.shiftKey) {
+  if (e.code === 'KeyG' && !e.shiftKey) {
     zoomHorizontal(1.5, 0.5);
-  } else if (key === 'h' && !e.shiftKey) {
+  } else if (e.code === 'KeyH' && !e.shiftKey) {
     zoomHorizontal(1 / 1.5, 0.5);
-  } else if (key === 'g' && e.shiftKey) {
+  } else if (e.code === 'KeyG' && e.shiftKey) {
     vertScale = Math.max(1, vertScale / 1.5);
     redraw();
-  } else if (key === 'h' && e.shiftKey) {
+  } else if (e.code === 'KeyH' && e.shiftKey) {
     vertScale = Math.min(50, vertScale * 1.5);
     redraw();
   }
