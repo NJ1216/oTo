@@ -321,7 +321,7 @@ fn compute_waveform_streaming(path: &std::path::Path, num_samples: usize, resolu
                 peaks.push((0.0_f32, 0.0_f32));
                 rms.push(0.0_f32);
             } else {
-                peaks.push((mn.max(-1.0).min(1.0), mx.max(-1.0).min(1.0)));
+                peaks.push((mn.clamp(-1.0, 1.0), mx.clamp(-1.0, 1.0)));
                 rms.push((sum_sq / count as f32).sqrt());
             }
         }
@@ -340,7 +340,7 @@ async fn get_waveform_data(path: String) -> Result<WaveformData, String> {
 
         let mut cmd = std::process::Command::new(&ffmpeg);
         cmd.args(["-y", "-i", &path, "-ar", "4000", "-f", "f32le", "-ac", "1",
-                   &temp.to_string_lossy().into_owned()]);
+                   &*temp.to_string_lossy()]);
         #[cfg(windows)]
         { use std::os::windows::process::CommandExt; cmd.creation_flags(0x08000000); }
         cmd.stderr(std::process::Stdio::piped());
@@ -512,4 +512,72 @@ pub fn run() {
         })
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::io::Write;
+
+    /// テスト用一時 RAW ファイルを作成して compute_waveform_streaming を検証
+    fn write_raw_f32(samples: &[f32]) -> std::path::PathBuf {
+        let mut path = std::env::temp_dir();
+        path.push(format!("oto_test_{}.raw", uuid::Uuid::new_v4()));
+        let mut f = std::fs::File::create(&path).unwrap();
+        for s in samples {
+            f.write_all(&s.to_le_bytes()).unwrap();
+        }
+        path
+    }
+
+    #[test]
+    fn waveform_streaming_empty_file_returns_zeros() {
+        let path = write_raw_f32(&[]);
+        let levels = compute_waveform_streaming(&path, 0, &[100]);
+        let _ = std::fs::remove_file(&path);
+        assert_eq!(levels.len(), 1);
+        assert!(levels[0].peaks.iter().all(|&(mn, mx)| mn == 0.0 && mx == 0.0));
+        assert!(levels[0].rms.iter().all(|&r| r == 0.0));
+    }
+
+    #[test]
+    fn waveform_streaming_constant_signal() {
+        // 全サンプル 0.5 の定常信号 → ピーク min/max は 0.5、RMS も 0.5
+        let samples: Vec<f32> = vec![0.5; 1000];
+        let path = write_raw_f32(&samples);
+        let levels = compute_waveform_streaming(&path, samples.len(), &[10]);
+        let _ = std::fs::remove_file(&path);
+        assert_eq!(levels.len(), 1);
+        for &(mn, mx) in &levels[0].peaks {
+            assert!((mn - 0.5).abs() < 1e-4, "min={mn}");
+            assert!((mx - 0.5).abs() < 1e-4, "max={mx}");
+        }
+        for &r in &levels[0].rms {
+            assert!((r - 0.5).abs() < 1e-4, "rms={r}");
+        }
+    }
+
+    #[test]
+    fn waveform_streaming_multi_resolution() {
+        let samples: Vec<f32> = (0..2000).map(|i| (i as f32 / 2000.0) * 2.0 - 1.0).collect();
+        let path = write_raw_f32(&samples);
+        let levels = compute_waveform_streaming(&path, samples.len(), &[50, 100, 200]);
+        let _ = std::fs::remove_file(&path);
+        assert_eq!(levels.len(), 3);
+        assert_eq!(levels[0].peaks.len(), 50);
+        assert_eq!(levels[1].peaks.len(), 100);
+        assert_eq!(levels[2].peaks.len(), 200);
+    }
+
+    #[test]
+    fn waveform_streaming_clamps_to_minus_one_plus_one() {
+        // 1.5 や -1.5 など ±1 を超えるサンプルはクランプされる
+        let samples = vec![2.0f32, -2.0, 1.5, -1.5];
+        let path = write_raw_f32(&samples);
+        let levels = compute_waveform_streaming(&path, samples.len(), &[1]);
+        let _ = std::fs::remove_file(&path);
+        let (mn, mx) = levels[0].peaks[0];
+        assert!(mn >= -1.0, "min {mn} < -1.0");
+        assert!(mx <= 1.0,  "max {mx} > 1.0");
+    }
 }

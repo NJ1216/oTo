@@ -105,3 +105,119 @@ pub fn select_best_sources(
 
     (selected, rejected)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::collections::HashMap;
+
+    fn make_info(is_lossless: bool, bit_rate_bps: u64) -> super::super::types::FileInfo {
+        super::super::types::FileInfo {
+            duration_secs: 100.0,
+            tags: HashMap::new(),
+            bits_per_sample: 16,
+            cover_art_stream_idx: None,
+            has_media: true,
+            is_lossless,
+            bit_rate_bps,
+        }
+    }
+
+    #[test]
+    fn single_file_is_always_selected() {
+        let files = vec![(PathBuf::from("/music/track.mp3"), make_info(false, 192_000))];
+        let (selected, rejected) = select_best_sources(files);
+        assert_eq!(selected.len(), 1);
+        assert!(rejected.is_empty());
+    }
+
+    #[test]
+    fn lossless_beats_lossy_same_stem() {
+        let files = vec![
+            (PathBuf::from("/music/track.mp3"), make_info(false, 320_000)),
+            (PathBuf::from("/music/track.flac"), make_info(true, 1_000_000)),
+        ];
+        let (selected, rejected) = select_best_sources(files);
+        assert_eq!(selected.len(), 1);
+        assert_eq!(rejected.len(), 1);
+        let ext = selected[0].0.extension().unwrap().to_str().unwrap();
+        assert_eq!(ext, "flac");
+    }
+
+    #[test]
+    fn wav_beats_flac_among_lossless() {
+        let files = vec![
+            (PathBuf::from("/music/track.flac"), make_info(true, 900_000)),
+            (PathBuf::from("/music/track.wav"), make_info(true, 1_400_000)),
+        ];
+        let (selected, rejected) = select_best_sources(files);
+        assert_eq!(selected.len(), 1);
+        assert_eq!(rejected.len(), 1);
+        let ext = selected[0].0.extension().unwrap().to_str().unwrap();
+        assert_eq!(ext, "wav");
+    }
+
+    #[test]
+    fn highest_bitrate_wins_among_all_lossy() {
+        let files = vec![
+            (PathBuf::from("/music/track.mp3"), make_info(false, 128_000)),
+            (PathBuf::from("/music/track.aac"), make_info(false, 256_000)),
+        ];
+        let (selected, rejected) = select_best_sources(files);
+        assert_eq!(selected.len(), 1);
+        assert_eq!(rejected.len(), 1);
+        let ext = selected[0].0.extension().unwrap().to_str().unwrap();
+        assert_eq!(ext, "aac");
+    }
+
+    #[test]
+    fn different_directories_are_not_grouped() {
+        let files = vec![
+            (PathBuf::from("/a/track.mp3"), make_info(false, 320_000)),
+            (PathBuf::from("/b/track.flac"), make_info(true, 1_000_000)),
+        ];
+        let (selected, rejected) = select_best_sources(files);
+        assert_eq!(selected.len(), 2);
+        assert!(rejected.is_empty());
+    }
+
+    #[test]
+    fn different_stems_not_grouped() {
+        let files = vec![
+            (PathBuf::from("/music/song1.mp3"), make_info(false, 192_000)),
+            (PathBuf::from("/music/song2.mp3"), make_info(false, 192_000)),
+        ];
+        let (selected, rejected) = select_best_sources(files);
+        assert_eq!(selected.len(), 2);
+        assert!(rejected.is_empty());
+    }
+
+    #[test]
+    fn common_ancestor_single_file() {
+        let paths = vec![PathBuf::from("/a/b/c.mp3")];
+        assert_eq!(common_ancestor(&paths), Some(PathBuf::from("/a/b")));
+    }
+
+    #[test]
+    fn common_ancestor_sibling_files() {
+        let paths = vec![
+            PathBuf::from("/a/b/x.mp3"),
+            PathBuf::from("/a/b/y.flac"),
+        ];
+        assert_eq!(common_ancestor(&paths), Some(PathBuf::from("/a/b")));
+    }
+
+    #[test]
+    fn common_ancestor_nested_dirs() {
+        let paths = vec![
+            PathBuf::from("/a/b/c/x.mp3"),
+            PathBuf::from("/a/b/y.flac"),
+        ];
+        assert_eq!(common_ancestor(&paths), Some(PathBuf::from("/a/b")));
+    }
+
+    #[test]
+    fn common_ancestor_empty_is_none() {
+        assert_eq!(common_ancestor(&[]), None);
+    }
+}

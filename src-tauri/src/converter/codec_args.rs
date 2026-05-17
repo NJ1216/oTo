@@ -109,3 +109,168 @@ pub fn build_codec_args(format: &str, settings: &Settings, info: &FileInfo) -> V
         _      => vec![],
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::settings::Settings;
+    use std::collections::HashMap;
+
+    fn default_info() -> super::super::types::FileInfo {
+        super::super::types::FileInfo {
+            duration_secs: 100.0,
+            tags: HashMap::new(),
+            bits_per_sample: 16,
+            cover_art_stream_idx: None,
+            has_media: true,
+            is_lossless: false,
+            bit_rate_bps: 192_000,
+        }
+    }
+
+    #[test]
+    fn mp3_preset_192_produces_cbr_bitrate() {
+        let s = Settings::default(); // mp3_preset = "192"
+        let args = build_codec_args("mp3", &s, &default_info());
+        assert_eq!(args[0], "-c:a");
+        assert_eq!(args[1], "libmp3lame");
+        assert!(args.contains(&"-b:a".to_string()));
+        assert!(args.contains(&"192k".to_string()));
+    }
+
+    #[test]
+    fn mp3_custom_vbr_uses_quality_flag() {
+        let mut s = Settings::default();
+        s.mp3_preset = "custom".into();
+        s.mp3_mode = "vbr".into();
+        s.mp3_vbr_quality = 2;
+        let args = build_codec_args("mp3", &s, &default_info());
+        assert!(args.contains(&"-q:a".to_string()));
+        assert!(args.contains(&"2".to_string()));
+        assert!(!args.contains(&"-b:a".to_string()));
+    }
+
+    #[test]
+    fn mp3_custom_cbr_uses_bitrate_flag() {
+        let mut s = Settings::default();
+        s.mp3_preset = "custom".into();
+        s.mp3_mode = "cbr".into();
+        s.mp3_bitrate = 256;
+        let args = build_codec_args("mp3", &s, &default_info());
+        assert!(args.contains(&"-b:a".to_string()));
+        assert!(args.contains(&"256k".to_string()));
+    }
+
+    #[test]
+    fn aac_preset_128_produces_cbr_bitrate() {
+        let s = Settings::default(); // aac_preset = "128"
+        let args = build_codec_args("aac", &s, &default_info());
+        assert_eq!(args[0], "-c:a");
+        assert_eq!(args[1], "aac");
+        assert!(args.contains(&"128k".to_string()));
+    }
+
+    #[test]
+    fn aac_custom_vbr_uses_vbr_flag() {
+        let mut s = Settings::default();
+        s.aac_preset = "custom".into();
+        s.aac_mode = "vbr".into();
+        s.aac_vbr_quality = 3;
+        let args = build_codec_args("aac", &s, &default_info());
+        assert!(args.contains(&"-vbr".to_string()));
+        assert!(args.contains(&"3".to_string()));
+    }
+
+    #[test]
+    fn opus_preset_produces_bitrate() {
+        let s = Settings::default(); // opus_preset = "128"
+        let args = build_codec_args("opus", &s, &default_info());
+        assert_eq!(args[0], "-c:a");
+        assert_eq!(args[1], "libopus");
+        assert!(args.contains(&"128k".to_string()));
+    }
+
+    #[test]
+    fn opus_custom_cbr_adds_vbr_off() {
+        let mut s = Settings::default();
+        s.opus_preset = "custom".into();
+        s.opus_mode = "cbr".into();
+        s.opus_bitrate = 96;
+        let args = build_codec_args("opus", &s, &default_info());
+        assert!(args.contains(&"-vbr".to_string()));
+        assert!(args.contains(&"off".to_string()));
+    }
+
+    #[test]
+    fn flac_default_compression_is_5() {
+        let s = Settings::default(); // flac_preset = "5"
+        let args = build_codec_args("flac", &s, &default_info());
+        assert_eq!(args[0], "-c:a");
+        assert_eq!(args[1], "flac");
+        assert!(args.contains(&"-compression_level".to_string()));
+        assert!(args.contains(&"5".to_string()));
+    }
+
+    #[test]
+    fn alac_16bit_default_no_sample_fmt() {
+        let s = Settings::default(); // alac_bit_depth = 16
+        let args = build_codec_args("alac", &s, &default_info());
+        assert_eq!(args[0], "-c:a");
+        assert_eq!(args[1], "alac");
+        assert!(!args.contains(&"-sample_fmt".to_string()));
+    }
+
+    #[test]
+    fn alac_custom_24bit_adds_s32p() {
+        let mut s = Settings::default();
+        s.alac_preset = "custom".into();
+        s.alac_bit_depth = 24;
+        let args = build_codec_args("alac", &s, &default_info());
+        assert!(args.contains(&"-sample_fmt".to_string()));
+        assert!(args.contains(&"s32p".to_string()));
+    }
+
+    #[test]
+    fn wav_16bit_uses_pcm_s16le() {
+        let args = build_codec_args("wav", &Settings::default(), &default_info());
+        assert_eq!(args[0], "-c:a");
+        assert_eq!(args[1], "pcm_s16le");
+    }
+
+    #[test]
+    fn wav_24bit_uses_pcm_s24le() {
+        let mut info = default_info();
+        info.bits_per_sample = 24;
+        let args = build_codec_args("wav", &Settings::default(), &info);
+        assert_eq!(args[1], "pcm_s24le");
+    }
+
+    #[test]
+    fn wav_32bit_uses_pcm_s32le() {
+        let mut info = default_info();
+        info.bits_per_sample = 32;
+        let args = build_codec_args("wav", &Settings::default(), &info);
+        assert_eq!(args[1], "pcm_s32le");
+    }
+
+    #[test]
+    fn aiff_16bit_uses_pcm_s16be() {
+        let args = build_codec_args("aiff", &Settings::default(), &default_info());
+        assert_eq!(args[0], "-c:a");
+        assert_eq!(args[1], "pcm_s16be");
+    }
+
+    #[test]
+    fn aiff_24bit_uses_pcm_s24be() {
+        let mut info = default_info();
+        info.bits_per_sample = 24;
+        let args = build_codec_args("aiff", &Settings::default(), &info);
+        assert_eq!(args[1], "pcm_s24be");
+    }
+
+    #[test]
+    fn unknown_format_returns_empty() {
+        let args = build_codec_args("ogg", &Settings::default(), &default_info());
+        assert!(args.is_empty());
+    }
+}

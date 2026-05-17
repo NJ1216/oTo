@@ -84,3 +84,53 @@ pub fn detect_boundary_silence(path: &Path, db: f64, min_dur_secs: f64, total_du
 
     (has_start, has_end)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn parse_empty_returns_empty() {
+        assert!(parse_silence_regions("").is_empty());
+    }
+
+    #[test]
+    fn parse_single_complete_region() {
+        let stderr = "[silencedetect] silence_start: 0\n[silencedetect] silence_end: 1.5 | silence_duration: 1.5\n";
+        let regions = parse_silence_regions(stderr);
+        assert_eq!(regions, vec![(0.0, 1.5)]);
+    }
+
+    #[test]
+    fn parse_multiple_regions() {
+        let stderr = concat!(
+            "[silencedetect] silence_start: 0\n",
+            "[silencedetect] silence_end: 0.5 | silence_duration: 0.5\n",
+            "[silencedetect] silence_start: 10\n",
+            "[silencedetect] silence_end: 10.8 | silence_duration: 0.8\n",
+        );
+        let regions = parse_silence_regions(stderr);
+        assert_eq!(regions, vec![(0.0, 0.5), (10.0, 10.8)]);
+    }
+
+    #[test]
+    fn parse_negative_start_clamped_to_zero() {
+        // OPUS のプリスキップ影響で silence_start が負になることがある
+        let stderr = "[silencedetect] silence_start: -0.1\n[silencedetect] silence_end: 1.0 | ...\n";
+        let regions = parse_silence_regions(stderr);
+        assert_eq!(regions, vec![(0.0, 1.0)]);
+    }
+
+    #[test]
+    fn parse_unclosed_start_not_captured() {
+        // silence_end がない場合は parse_silence_regions は捕捉しない（detect_boundary_silence が補完）
+        let stderr = "[silencedetect] silence_start: 5.0\n";
+        assert!(parse_silence_regions(stderr).is_empty());
+    }
+
+    #[test]
+    fn parse_end_without_preceding_start_is_ignored() {
+        let stderr = "[silencedetect] silence_end: 1.0 | silence_duration: 1.0\n";
+        assert!(parse_silence_regions(stderr).is_empty());
+    }
+}

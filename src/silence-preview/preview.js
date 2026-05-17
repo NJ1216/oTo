@@ -1,4 +1,5 @@
 import { initI18n, t } from '../i18n/index.js';
+import { detectSilence } from './silence-utils.js';
 
 import { invoke, convertFileSrc } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
@@ -308,7 +309,7 @@ async function runAnalyze() {
   try {
     const levelIdx = waveformLevels.length - 1;
     const level = waveformLevels[levelIdx];
-    silenceRegions = detectSilence(level.rms, db, dur / 1000.0);
+    silenceRegions = detectSilence(level.rms, db, dur / 1000.0, totalDuration);
     redraw();
     const count   = silenceRegions.length;
     const trimmed = silenceRegions.reduce((s, [a, b]) => s + (b - a), 0);
@@ -330,62 +331,6 @@ async function runAnalyze() {
   } catch (err) {
     statusEl.textContent = t('silencePreview.error', { msg: err });
   }
-}
-
-function detectSilence(rmsValues, db, minDurationSecs) {
-  const dbLinear = Math.pow(10, db / 20);
-  const n = rmsValues.length;
-  if (n === 0) return [];
-
-  const sampleDur = totalDuration / n;
-  const allRegions = [];
-  let inSilence = false;
-  let silenceStart = 0;
-
-  for (let i = 0; i < n; i++) {
-    const isQuiet = rmsValues[i] < dbLinear;
-
-    if (isQuiet && !inSilence) {
-      inSilence = true;
-      silenceStart = i * sampleDur;
-    } else if (!isQuiet && inSilence) {
-      const silenceEnd = i * sampleDur;
-      if (silenceEnd - silenceStart >= minDurationSecs) {
-        allRegions.push([silenceStart, silenceEnd]);
-      }
-      inSilence = false;
-    }
-  }
-
-  if (inSilence) {
-    const silenceEnd = totalDuration;
-    if (silenceEnd - silenceStart >= minDurationSecs) {
-      allRegions.push([silenceStart, silenceEnd]);
-    }
-  }
-
-  if (allRegions.length === 0) return [];
-
-  const tolerance = 0.05; // 50ms tolerance — match Rust logic
-  const result = [];
-
-  // Only treat as "start silence" if it begins near the very start
-  if (allRegions[0][0] <= tolerance) {
-    result.push(allRegions[0]);
-  }
-
-  // Only treat as "end silence" if it ends near the very end
-  if (allRegions.length > 1) {
-    const last = allRegions[allRegions.length - 1];
-    if (Math.abs(totalDuration - last[1]) <= tolerance) {
-      // Avoid duplicating the same region
-      if (result.length === 0 || last !== result[0]) {
-        result.push(last);
-      }
-    }
-  }
-
-  return result;
 }
 
 [dbInput, durInput].forEach((el) => {

@@ -38,6 +38,7 @@ const MAX_FILE_SIZE: u64 = 10 * 1024 * 1024 * 1024; // 10 GiB
 
 // --- Single file conversion ---
 
+#[allow(clippy::too_many_arguments)]
 async fn convert_one(
     input: &Path,
     output: &Path,
@@ -283,12 +284,10 @@ async fn convert_one(
         return Err(anyhow!("{}", if tail.is_empty() { "unknown error (no stderr)".into() } else { tail }));
     }
 
-    if settings.source_file_action == SourceFileAction::Delete {
-        if output.exists() {
-            if let Ok(meta) = std::fs::metadata(output) {
-                if meta.len() > 0 {
-                    let _ = std::fs::remove_file(input);
-                }
+    if settings.source_file_action == SourceFileAction::Delete && output.exists() {
+        if let Ok(meta) = std::fs::metadata(output) {
+            if meta.len() > 0 {
+                let _ = std::fs::remove_file(input);
             }
         }
     }
