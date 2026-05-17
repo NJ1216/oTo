@@ -33,7 +33,7 @@ export async function initSVGController(containerEl, format, mode) {
   await Promise.all(
     names.map(async (name) => {
       try {
-        const r = await fetch(`svgs/${name}.svg`);
+        const r = await fetch(`/svgs/${name}.svg`);
         svgCache[name] = await r.text();
       } catch (e) {
         console.error(`Failed to load ${name}.svg`, e);

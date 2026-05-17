@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>oTo</title>
-  <link rel="stylesheet" href="style.css" />
+  <link rel="stylesheet" href="/src/style.css" />
 </head>
 <body>
   <!-- SVG background (filled by svg-controller.js) -->
@@ -17,7 +17,7 @@
       <!-- ENCODE formats: 非可逆(MP3/AAC/OPUS) → 可逆(FLAC/ALAC) -->
       <button class="fmt-btn active" data-fmt="mp3">MP3</button>
       <button class="fmt-btn" data-fmt="aac">AAC</button>
-            <button class="fmt-btn" data-fmt="opus">OPUS</button>
+      <button class="fmt-btn" data-fmt="opus">OPUS</button>
       <button class="fmt-btn" data-fmt="flac">FLAC</button>
       <button class="fmt-btn" data-fmt="alac">ALAC</button>
       <!-- DECODE formats -->
@@ -57,6 +57,6 @@
   <!-- Toast notification -->
   <div id="toast" class="toast"></div>
 
-  <script type="module" src="main.js"></script>
+  <script type="module" src="/src/main.js"></script>
 </body>
 </html>

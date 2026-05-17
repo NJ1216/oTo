@@ -1,8 +1,9 @@
+import { invoke } from '@tauri-apps/api/core';
+import { listen } from '@tauri-apps/api/event';
+import { homeDir } from '@tauri-apps/api/path';
+import { getCurrentWebviewWindow } from '@tauri-apps/api/webviewWindow';
 import { initSVGController, setState, setFormat, setMode, setProgress } from './svg-controller.js';
 import { initI18n, t } from './i18n/index.js';
-
-const { invoke } = window.__TAURI__.core;
-const { listen } = window.__TAURI__.event;
 
 // --- State ---
 let appSettings = null;
@@ -35,12 +36,12 @@ async function init() {
     };
   }
 
-  try { homeDirPath = await window.__TAURI__.path.homeDir(); } catch (_) {}
+  try { homeDirPath = await homeDir(); } catch (_) {}
 
   await initI18n(appSettings.language || '');
   const title = t('window.main');
   document.title = title;
-  window.__TAURI__.webviewWindow.getCurrentWebviewWindow().setTitle(title);
+  getCurrentWebviewWindow().setTitle(title);
 
   currentMode = appSettings.lastMode || 'encode';
   currentFormat = appSettings.lastFormat || 'mp3';
@@ -48,13 +49,12 @@ async function init() {
 
   await initSVGController(bgContainer, currentFormat, currentMode);
 
-  applyModeToUI(); // 内部でapplyFormatToUI/applyDecodeFormatToUIを呼ぶ
+  applyModeToUI();
 
   registerDragDrop();
   registerContextMenu();
   registerEventListeners();
 
-  // Listen for Tauri conversion events
   await listen('progress', (event) => {
     const { percent } = event.payload;
     if (isProcessing) {
@@ -75,7 +75,6 @@ async function init() {
     saveLastSettings();
   });
 
-  // Listen for settings update from settings window
   await listen('settings_updated', async () => {
     appSettings = await invoke('get_settings');
     await initI18n(appSettings.language || '');
@@ -122,7 +121,6 @@ function applyFormatToUI() {
     btn.classList.toggle('active', btn.dataset.fmt === currentFormat);
   });
 
-  // currentFormat が非表示になった場合は最初の有効フォーマットに切り替え
   if (!enabled.includes(currentFormat)) {
     currentFormat = enabled[0] || 'mp3';
     document.querySelectorAll('.fmt-btn').forEach((btn) => {
@@ -138,7 +136,7 @@ function saveLastSettings() {
   appSettings.lastMode = currentMode;
   appSettings.lastFormat = currentFormat;
   appSettings.lastDecodeFormat = currentDecodeFormat;
-  invoke('save_settings', { s: appSettings }).catch(() => {});
+  invoke('save_settings', { s: appSettings }).catch((e) => console.error('save_settings failed:', e));
 }
 
 // --- Toggle switch ---

@@ -28,3 +28,4 @@ src-tauri/binaries/
 .idea/
 *.swp
 *.swo
+dist/

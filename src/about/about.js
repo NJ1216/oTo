@@ -1,6 +1,6 @@
+import { invoke } from '@tauri-apps/api/core';
+import { getCurrentWebviewWindow } from '@tauri-apps/api/webviewWindow';
 import { initI18n, t } from '../i18n/index.js';
-
-const { invoke } = window.__TAURI__.core;
 
 const GITHUB_URL = 'https://github.com/NJ1216/oTo';
 
@@ -71,7 +71,7 @@ async function init() {
   await initI18n(lang);
   const title = t('window.about');
   document.title = title;
-  window.__TAURI__.webviewWindow.getCurrentWebviewWindow().setTitle(title);
+  getCurrentWebviewWindow().setTitle(title);
   buildLibList();
 
   const version = await invoke('get_app_version');
@@ -84,7 +84,7 @@ async function init() {
 }
 
 document.getElementById('close-btn').addEventListener('click', () => {
-  window.__TAURI__.webviewWindow.getCurrentWebviewWindow().close();
+  getCurrentWebviewWindow().close();
 });
 
 init().catch(console.error);

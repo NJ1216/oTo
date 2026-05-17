@@ -1,6 +1,7 @@
+import { invoke } from '@tauri-apps/api/core';
+import { emit } from '@tauri-apps/api/event';
+import { getCurrentWebviewWindow } from '@tauri-apps/api/webviewWindow';
 import { initI18n, t } from '../i18n/index.js';
-
-const { invoke } = window.__TAURI__.core;
 
 let settings = null;
 let customPath = null;
@@ -11,7 +12,7 @@ async function init() {
   await initI18n(settings.language || '');
   const title = t('window.settings');
   document.title = title;
-  window.__TAURI__.webviewWindow.getCurrentWebviewWindow().setTitle(title);
+  getCurrentWebviewWindow().setTitle(title);
   populateForm(settings);
 }
 
@@ -29,25 +30,19 @@ function updateCustomPathDisplay() {
 }
 
 function populateForm(s) {
-  // Output destination
   document.getElementById('outputDest').value = snakeCase(s.outputDest) || 'source_folder';
   updateCustomPathDisplay();
   updateCustomPathRow();
   document.getElementById('preserveFolderStructure').checked = !!s.preserveFolderStructure;
 
-  // Decode formats
   const enabledDecode = s.enabledDecodeFormats || ['wav', 'aiff'];
   document.querySelectorAll('.decode-toggle-btn').forEach((btn) => {
     btn.classList.toggle('active', enabledDecode.includes(btn.dataset.fmt));
   });
 
-  // Source file action
   document.getElementById('sourceAction').value = snakeCase(s.sourceFileAction) || 'keep';
-
-  // Name conflict
   document.getElementById('nameConflict').value = snakeCase(s.nameConflict) || 'auto_rename';
 
-  // Quality presets
   setPreset('mp3Preset', s.mp3Preset || '192');
   const mp3Mode = s.mp3Mode || 'cbr';
   document.querySelectorAll('input[name="mp3Mode"]').forEach((r) => { r.checked = r.value === mp3Mode; });
@@ -78,19 +73,14 @@ function populateForm(s) {
   setPreset('alacPreset', s.alacPreset || '');
   document.getElementById('alacBitDepth').value = String(s.alacBitDepth || 16);
 
-  // Silence trim
   document.getElementById('silenceTrimEnabled').checked = !!s.silenceTrimEnabled;
 
-  // Enabled formats (button UI) — encode group only; decode group handled above
   const enabled = s.enabledFormats || ['mp3', 'aac', 'flac'];
   document.querySelectorAll('#encode-fmt-group .fmt-toggle-btn').forEach((btn) => {
     btn.classList.toggle('active', enabled.includes(btn.dataset.fmt));
   });
 
-  // Open in Finder
   document.getElementById('openInFinder').checked = s.openInFinder;
-
-  // Language
   document.getElementById('language').value = s.language || '';
 }
 
@@ -114,24 +104,20 @@ function toggleCustomDetail(selectId, show) {
   if (detail) detail.classList.toggle('open', show);
 }
 
-// Wire up all preset selects to show/hide custom panels
 ['mp3Preset', 'aacPreset', 'opusPreset', 'flacPreset', 'alacPreset'].forEach((id) => {
   document.getElementById(id)?.addEventListener('change', (e) => {
     toggleCustomDetail(id, e.target.value === 'custom');
   });
 });
 
-// Output dest select
 document.getElementById('outputDest').addEventListener('change', updateCustomPathRow);
 
-// CBR/VBR mode radios
 ['mp3', 'aac'].forEach((fmt) => {
   document.querySelectorAll(`input[name="${fmt}Mode"]`).forEach((r) => {
     r.addEventListener('change', (e) => toggleCbrVbr(fmt, e.target.value));
   });
 });
 
-// Encode format toggle buttons (min 1)
 document.querySelectorAll('#encode-fmt-group .fmt-toggle-btn').forEach((btn) => {
   btn.addEventListener('click', () => {
     const activeCount = document.querySelectorAll('#encode-fmt-group .fmt-toggle-btn.active').length;
@@ -140,7 +126,6 @@ document.querySelectorAll('#encode-fmt-group .fmt-toggle-btn').forEach((btn) => 
   });
 });
 
-// Decode format toggle buttons (min 1)
 document.querySelectorAll('.decode-toggle-btn').forEach((btn) => {
   btn.addEventListener('click', () => {
     const activeCount = document.querySelectorAll('.decode-toggle-btn.active').length;
@@ -154,7 +139,6 @@ function snakeCase(val) {
   return val.replace(/([A-Z])/g, (m) => '_' + m.toLowerCase());
 }
 
-// Folder picker
 document.getElementById('pick-folder-btn').addEventListener('click', async () => {
   const path = await invoke('pick_folder');
   if (path) {
@@ -165,17 +149,14 @@ document.getElementById('pick-folder-btn').addEventListener('click', async () =>
   }
 });
 
-// Open detail settings (waveform preview)
 document.getElementById('open-preview-btn').addEventListener('click', async () => {
   await invoke('open_silence_preview');
 });
 
-// Language real-time preview
 document.getElementById('language').addEventListener('change', (e) => {
   initI18n(e.target.value);
 });
 
-// Save
 document.getElementById('save-btn').addEventListener('click', async () => {
   const updated = {
     ...settings,
@@ -218,14 +199,13 @@ document.getElementById('save-btn').addEventListener('click', async () => {
   };
 
   await invoke('save_settings', { s: updated });
-  await window.__TAURI__.event.emit('settings_updated', null);
-  await window.__TAURI__.webviewWindow.getCurrentWebviewWindow().close();
+  await emit('settings_updated');
+  await getCurrentWebviewWindow().close();
 });
 
-// Cancel — restore saved language before closing
 document.getElementById('cancel-btn').addEventListener('click', async () => {
   if (settings) await initI18n(settings.language || '');
-  await window.__TAURI__.webviewWindow.getCurrentWebviewWindow().close();
+  await getCurrentWebviewWindow().close();
 });
 
 init().catch(console.error);

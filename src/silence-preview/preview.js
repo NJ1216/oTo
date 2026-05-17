@@ -1,7 +1,8 @@
 import { initI18n, t } from '../i18n/index.js';
 
-const { invoke } = window.__TAURI__.core;
-const { listen } = window.__TAURI__.event;
+import { invoke } from '@tauri-apps/api/core';
+import { listen } from '@tauri-apps/api/event';
+import { getCurrentWebviewWindow } from '@tauri-apps/api/webviewWindow';
 
 const dropZone   = document.getElementById('drop-zone');
 const dropHint   = document.getElementById('drop-hint');
@@ -71,7 +72,7 @@ async function init() {
 }
 
 function applyI18n() {
-  const win = window.__TAURI__.webviewWindow.getCurrentWebviewWindow();
+  const win = getCurrentWebviewWindow();
   win.setTitle(t('settings.silencePreview.title'));
   document.title = t('settings.silencePreview.title');
   dropHint.textContent = t('silencePreview.drop');
@@ -525,7 +526,7 @@ const btnCancel = document.getElementById('btn-cancel');
 const btnApply  = document.getElementById('btn-apply');
 
 btnCancel.addEventListener('click', async () => {
-  const win = window.__TAURI__.webviewWindow.getCurrentWebviewWindow();
+  const win = getCurrentWebviewWindow();
   await win.close();
 });
 
@@ -536,7 +537,7 @@ btnApply.addEventListener('click', async () => {
     s.silenceTrimDurationMs = parseInt(durInput.value, 10) || 50;
     await invoke('save_settings', { s });
   } catch (_) {}
-  const win = window.__TAURI__.webviewWindow.getCurrentWebviewWindow();
+  const win = getCurrentWebviewWindow();
   await win.close();
 });
 
