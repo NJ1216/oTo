@@ -29,7 +29,6 @@ let waveformLevels = [];
 let totalDuration  = 0;
 let analyzeTimer   = null;
 let silenceRegions = [];
-let channelCount   = 1;
 
 // --- Zoom state ---
 let viewStart = 0;
@@ -129,7 +128,6 @@ listen('tauri://drag-drop', async (event) => {
 async function loadFile(path, name) {
   currentPath    = path;
   waveformLevels = [];
-  channelCount   = 1;
   silenceRegions = [];
   viewStart = 0;
   viewEnd   = 1;
@@ -154,7 +152,6 @@ async function loadFile(path, name) {
   try {
     const data = await invoke('get_waveform_data', { path });
     waveformLevels = data.levels;
-    channelCount = data.channels;
     totalDuration = data.durationSecs;
     fileDurEl.textContent = formatDuration(totalDuration);
     redraw();
@@ -189,10 +186,10 @@ function clearCanvas() {
 function redraw() {
   if (waveformLevels.length === 0) return;
   const levelIdx = waveformLevels.length - 1;
-  drawWaveform([waveformLevels[levelIdx].peaks], silenceRegions);
+  drawWaveform(waveformLevels[levelIdx].peaks, silenceRegions);
 }
 
-function drawWaveform(allChannels, regions) {
+function drawWaveform(peaks, regions) {
   const W = canvas.offsetWidth  || 800;
   const H = canvas.offsetHeight || 300;
   canvas.width  = W;
@@ -201,10 +198,7 @@ function drawWaveform(allChannels, regions) {
   const ctx = canvas.getContext('2d');
   ctx.clearRect(0, 0, W, H);
 
-  if (!allChannels || allChannels.length === 0 || allChannels[0].length === 0) return;
-
-  const numChannels = allChannels.length;
-  const channelH = H / numChannels;
+  if (!peaks || peaks.length === 0) return;
 
   if (regions.length > 0 && totalDuration > 0) {
     ctx.fillStyle = 'rgba(239, 68, 68, 0.18)';
@@ -217,22 +211,9 @@ function drawWaveform(allChannels, regions) {
     }
   }
 
-  for (let ch = 0; ch < numChannels; ch++) {
-    const peaks = allChannels[ch];
-    const startIdx = Math.floor(viewStart * peaks.length);
-    const endIdx   = Math.ceil(viewEnd   * peaks.length);
-    const offsetY = ch * channelH;
-    drawChannel(ctx, peaks, startIdx, endIdx, regions, W, channelH, offsetY, vertScale);
-
-    if (ch > 0) {
-      ctx.strokeStyle = 'rgba(255, 255, 255, 0.15)';
-      ctx.lineWidth = 1;
-      ctx.beginPath();
-      ctx.moveTo(0, offsetY);
-      ctx.lineTo(W, offsetY);
-      ctx.stroke();
-    }
-  }
+  const startIdx = Math.floor(viewStart * peaks.length);
+  const endIdx   = Math.ceil(viewEnd   * peaks.length);
+  drawChannel(ctx, peaks, startIdx, endIdx, regions, W, H, vertScale);
 
   // Playback position indicator
   if (isPlaying && playbackProgress > 0 && totalDuration > 0) {
@@ -250,9 +231,9 @@ function drawWaveform(allChannels, regions) {
   }
 }
 
-function drawChannel(ctx, peaks, startIdx, endIdx, regions, canvasW, halfH, offsetY, vScale) {
-  const midY = offsetY + halfH / 2;
-  const scaleY = (halfH / 2) * 0.92 * Math.min(vScale, 50);
+function drawChannel(ctx, peaks, startIdx, endIdx, regions, canvasW, canvasH, vScale) {
+  const midY = canvasH / 2;
+  const scaleY = (canvasH / 2) * 0.92 * Math.min(vScale, 50);
   const visibleCount = endIdx - startIdx;
   if (visibleCount <= 0) return;
 
@@ -270,8 +251,8 @@ function drawChannel(ctx, peaks, startIdx, endIdx, regions, canvasW, halfH, offs
     }
 
     const x = px;
-    const y1 = midY - Math.min(mx * scaleY, halfH / 2);
-    const y2 = midY - Math.max(mn * scaleY, -halfH / 2);
+    const y1 = midY - Math.min(mx * scaleY, canvasH / 2);
+    const y2 = midY - Math.max(mn * scaleY, -canvasH / 2);
 
     const tPos = (viewStart + (px / canvasW) * (viewEnd - viewStart)) * totalDuration;
     const inSilence = regions.some(([s, e]) => tPos >= s && tPos <= e);

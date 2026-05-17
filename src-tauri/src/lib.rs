@@ -237,7 +237,6 @@ struct WaveformLevel {
 struct WaveformData {
     levels: Vec<WaveformLevel>,
     duration_secs: f64,
-    channels: usize,
 }
 
 fn compute_peaks_and_rms(samples: &[f32], num_buckets: usize) -> (Vec<(f32, f32)>, Vec<f32>) {
@@ -295,43 +294,11 @@ async fn get_waveform_data(path: String) -> Result<WaveformData, String> {
     tokio::task::spawn_blocking(move || {
         let ffmpeg = converter::ffmpeg_path();
 
-        // First, probe the original channel count
-        let mut probe_cmd = std::process::Command::new(&ffmpeg);
-        probe_cmd.args(["-i", &path, "-f", "null", "-"]);
-        #[cfg(windows)]
-        { use std::os::windows::process::CommandExt; probe_cmd.creation_flags(0x08000000); }
-        probe_cmd.stderr(std::process::Stdio::piped());
-        let probe_out = probe_cmd.output().map_err(|e| e.to_string())?;
-        let probe_stderr = String::from_utf8_lossy(&probe_out.stderr);
-
-        let mut channel_count: usize = 1;
-        for line in probe_stderr.lines() {
-            if let Some(pos) = line.find("Audio:") {
-                let after = &line[pos..];
-                for token in after.split(',') {
-                    let token = token.trim();
-                    if let Some(rest) = token.strip_suffix(" channels") {
-                        if let Ok(n) = rest.trim().parse::<usize>() {
-                            channel_count = n;
-                            break;
-                        }
-                    } else if let Some(rest) = token.strip_suffix(" channel") {
-                        if let Ok(n) = rest.trim().parse::<usize>() {
-                            channel_count = n;
-                            break;
-                        }
-                    }
-                }
-                if channel_count > 1 { break; }
-            }
-        }
-        channel_count = channel_count.clamp(1, 8);
-
         let mut temp = std::env::temp_dir();
         temp.push(format!("oto_wave_multi_{}.raw", std::process::id()));
 
         let mut cmd = std::process::Command::new(&ffmpeg);
-        cmd.args(["-y", "-i", &path, "-ar", "4000", "-f", "f32le", "-ac", &channel_count.to_string(),
+        cmd.args(["-y", "-i", &path, "-ar", "4000", "-f", "f32le", "-ac", "1",
                    &temp.to_string_lossy().into_owned()]);
         #[cfg(windows)]
         { use std::os::windows::process::CommandExt; cmd.creation_flags(0x08000000); }
@@ -346,24 +313,17 @@ async fn get_waveform_data(path: String) -> Result<WaveformData, String> {
             .map(|b| f32::from_le_bytes(b.try_into().unwrap()))
             .collect();
 
-        let samples_per_channel = samples.len() / channel_count;
-        let duration_secs = samples_per_channel as f64 / 4000.0;
-
-        // Deinterleave into per-channel vectors
-        let mut channels: Vec<Vec<f32>> = vec![Vec::new(); channel_count];
-        for (i, s) in samples.iter().enumerate().take(samples_per_channel * channel_count) {
-            channels[i % channel_count].push(*s);
-        }
+        let duration_secs = samples.len() as f64 / 4000.0;
 
         let resolutions = [800, 8000, 80000];
         let levels: Vec<WaveformLevel> = resolutions.iter()
             .map(|&res| {
-                let (peaks, rms) = compute_peaks_and_rms(&channels[0], res);
+                let (peaks, rms) = compute_peaks_and_rms(&samples, res);
                 WaveformLevel { peaks, rms }
             })
             .collect();
 
-        Ok(WaveformData { levels, duration_secs, channels: channel_count })
+        Ok(WaveformData { levels, duration_secs })
     }).await.map_err(|e| e.to_string())?
 }
 
