@@ -273,3 +273,44 @@ input:checked + .slider::before {
   background: rgba(220, 55, 55, 0.75);
   color: #fff;
 }
+
+#btn-quit-resume {
+  background: rgba(255, 255, 255, 0.15);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  color: rgba(255, 255, 255, 0.9);
+}
+
+#btn-quit-close {
+  background: #ef4444;
+  color: #fff;
+}
+
+.overwrite-dialog-box {
+  min-width: 260px;
+  max-width: 340px;
+}
+
+.overwrite-filename {
+  font-family: 'Arial', sans-serif;
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.55);
+  word-break: break-all;
+  margin: -12px 0 0;
+}
+
+#btn-overwrite-cancel {
+  background: #ef4444;
+  color: #fff;
+}
+
+#btn-overwrite-rename {
+  background: rgba(255, 255, 255, 0.15);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  color: rgba(255, 255, 255, 0.9);
+}
+
+#btn-overwrite-ok {
+  background: rgba(255, 255, 255, 0.15);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  color: rgba(255, 255, 255, 0.9);
+}

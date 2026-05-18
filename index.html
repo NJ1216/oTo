@@ -58,6 +58,30 @@
     </div>
   </div>
 
+  <!-- Overwrite confirm dialog -->
+  <div id="overwrite-dialog" class="pause-dialog hidden">
+    <div class="pause-dialog-box overwrite-dialog-box">
+      <p class="pause-dialog-msg" data-i18n="dialog.overwriteMsg">このファイルはすでに存在します。</p>
+      <p id="overwrite-filename" class="overwrite-filename"></p>
+      <div class="pause-dialog-btns">
+        <button id="btn-overwrite-cancel" data-i18n="dialog.overwriteCancel">中止</button>
+        <button id="btn-overwrite-rename" data-i18n="dialog.overwriteRename">別名保存</button>
+        <button id="btn-overwrite-ok" data-i18n="dialog.overwriteOk">上書き</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Quit confirm dialog (Cmd+Q during conversion) -->
+  <div id="quit-confirm-dialog" class="pause-dialog hidden">
+    <div class="pause-dialog-box">
+      <p class="pause-dialog-msg" data-i18n="dialog.quitMsg">変換中です。アプリを閉じますか？</p>
+      <div class="pause-dialog-btns">
+        <button id="btn-quit-resume" data-i18n="dialog.continueConvert">変換を続ける</button>
+        <button id="btn-quit-close" data-i18n="dialog.quitAndClose">閉じる</button>
+      </div>
+    </div>
+  </div>
+
   <!-- Toast notification -->
   <div id="toast" class="toast"></div>
 
