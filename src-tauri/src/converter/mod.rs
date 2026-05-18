@@ -85,11 +85,11 @@ async fn convert_one(
     let mut output_guard = OutputGuard { path: output.to_path_buf(), keep: false, backup: backup_path };
 
     let ffmpeg = ffmpeg_path();
+    // Input/output paths are added to cmd directly as OsStr (see below) to
+    // support non-UTF-8 filenames. Only non-path args go in this Vec.
     let mut args: Vec<String> = vec![
         "-threads".into(), threads_per_job.to_string(),
         "-y".into(),
-        "-i".into(),
-        input.to_string_lossy().into_owned(),
         "-map_metadata".into(),
         "0".into(),
         "-map".into(),
@@ -116,7 +116,13 @@ async fn convert_one(
     // Explicit tag copy (source tags take priority)
     for (k, v) in &info.tags {
         args.push("-metadata".into());
-        args.push(format!("{}={}", k, v));
+        // Vorbis Comment (FLAC/OPUS) conventionally uses UPPERCASE keys
+        let key = if matches!(format, "flac" | "opus") {
+            k.to_uppercase()
+        } else {
+            k.clone()
+        };
+        args.push(format!("{}={}", key, v));
     }
 
     // Silence trim (-af silenceremove) — only apply when silence actually exists
@@ -170,17 +176,22 @@ async fn convert_one(
     };
     args.push("-nostats".into());
 
-    args.push(output.to_string_lossy().into_owned());
-
+    // args[..3] = [-threads, N, -y]; args[3..] = [-map_metadata … -nostats]
+    // Input/output are passed as OsStr via .arg() to handle non-UTF-8 filenames.
     let mut cmd = tokio::process::Command::new(&ffmpeg);
+    cmd.args(&args[..3])
+       .arg("-i")
+       .arg(input)
+       .args(&args[3..])
+       .arg(output);
     #[cfg(not(windows))]
-    cmd.args(&args)
-       .stdout(Stdio::piped())
-       .stderr(Stdio::piped());
+    {
+        cmd.stdout(Stdio::piped())
+           .stderr(Stdio::piped());
+    }
     #[cfg(windows)]
     {
-        cmd.args(&args)
-           .stdin(Stdio::null())
+        cmd.stdin(Stdio::null())
            .stdout(Stdio::null())   // プログレスは一時ファイルへ。stdout は不使用
            .stderr(Stdio::piped())
            .creation_flags(0x08000000); // CREATE_NO_WINDOW
@@ -257,6 +268,19 @@ async fn convert_one(
             }
             // ffmpeg が終了した場合（正常・異常問わず）確実にループを抜ける
             if child.try_wait().map(|opt| opt.is_some()).unwrap_or(false) {
+                // 終了直後の最終プログレスを取り逃さないよう再読込
+                if let Ok(content) = tokio::fs::read_to_string(&progress_path).await {
+                    let mut last_us = 0u64;
+                    for line in content.lines() {
+                        if let Some(val) = line.strip_prefix("out_time_us=") {
+                            last_us = val.trim().parse().unwrap_or(0);
+                        }
+                    }
+                    if last_us > prev_us && duration_secs > 0.0 {
+                        let ratio = (last_us as f64 / 1_000_000.0) / duration_secs;
+                        on_progress(ratio.min(1.0));
+                    }
+                }
                 break;
             }
         }

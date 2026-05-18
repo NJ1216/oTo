@@ -11,8 +11,8 @@ pub async fn probe_file(path: &Path) -> Result<FileInfo, String> {
         "-print_format", "json",
         "-show_format",
         "-show_streams",
-        path.to_str().unwrap_or(""),
     ]);
+    probe_cmd.arg(path); // Pass as OsStr to support non-UTF-8 filenames
     #[cfg(windows)]
     probe_cmd.creation_flags(0x08000000); // CREATE_NO_WINDOW
     let output = match probe_cmd.output().await {

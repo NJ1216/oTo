@@ -63,7 +63,10 @@ async fn cancel_job(
         {
             let pgids = job.pgids.lock().await;
             for &pgid in pgids.iter() {
-                unsafe { libc::kill(-pgid, libc::SIGKILL); }
+                let ret = unsafe { libc::kill(-pgid, libc::SIGKILL) };
+                if ret != 0 {
+                    eprintln!("kill({}, SIGKILL) failed: {}", -pgid, std::io::Error::last_os_error());
+                }
             }
         }
         #[cfg(windows)]
@@ -75,7 +78,9 @@ async fn cancel_job(
                 unsafe {
                     let handle = OpenProcess(PROCESS_TERMINATE, 0, pid as u32);
                     if !handle.is_null() {
-                        TerminateProcess(handle, 1);
+                        if TerminateProcess(handle, 1) == 0 {
+                            eprintln!("TerminateProcess failed for pid {}", pid);
+                        }
                         CloseHandle(handle);
                     }
                 }
@@ -153,7 +158,14 @@ async fn suspend_resume_windows_processes(
                     if entry.th32OwnerProcessID == pid as u32 {
                         let thread = OpenThread(THREAD_SUSPEND_RESUME, 0, entry.th32ThreadID);
                         if !thread.is_null() {
-                            if suspend { SuspendThread(thread); } else { ResumeThread(thread); }
+                            let ret = if suspend { SuspendThread(thread) } else { ResumeThread(thread) };
+                            if ret == u32::MAX {
+                                eprintln!(
+                                    "{} failed for thread {}",
+                                    if suspend { "SuspendThread" } else { "ResumeThread" },
+                                    entry.th32ThreadID
+                                );
+                            }
                             CloseHandle(thread);
                         }
                     }
