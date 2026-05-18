@@ -1,6 +1,7 @@
 import { invoke } from '@tauri-apps/api/core';
 import { getCurrentWebviewWindow } from '@tauri-apps/api/webviewWindow';
 import { initI18n, t } from '../i18n/index.js';
+import { cargoVersions } from 'virtual:cargo-meta';
 
 const GITHUB_URL = 'https://github.com/NJ1216/oTo';
 
@@ -13,14 +14,14 @@ const BADGE_CLASS = {
 const LIBS = [
   { name: 'oTo',             license: 'MIT',       url: GITHUB_URL },
   { sectionKey: 'about.libsSection.rust' },
-  { name: 'tauri',           license: 'MIT',       url: 'https://tauri.app' },
-  { name: 'FFmpeg',          license: 'LGPL 2.1+', url: 'https://ffmpeg.org' },
-  { name: 'tokio',           license: 'MIT',       url: 'https://tokio.rs' },
-  { name: 'serde',           license: 'MIT',       url: 'https://serde.rs' },
-  { name: 'walkdir',         license: 'MIT',       url: 'https://github.com/BurntSushi/walkdir' },
-  { name: 'uuid',            license: 'MIT',       url: 'https://github.com/uuid-rs/uuid' },
-  { name: 'anyhow',          license: 'MIT',       url: 'https://github.com/dtolnay/anyhow' },
-  { name: 'dirs',            license: 'MIT',       url: 'https://github.com/dirs-dev/dirs-rs' },
+  { name: 'tauri',           version: cargoVersions.tauri,   license: 'MIT',       url: 'https://tauri.app' },
+  { name: 'FFmpeg',                                           license: 'LGPL 2.1+', url: 'https://ffmpeg.org' },
+  { name: 'tokio',           version: cargoVersions.tokio,   license: 'MIT',       url: 'https://tokio.rs' },
+  { name: 'serde',           version: cargoVersions.serde,   license: 'MIT',       url: 'https://serde.rs' },
+  { name: 'walkdir',         version: cargoVersions.walkdir, license: 'MIT',       url: 'https://github.com/BurntSushi/walkdir' },
+  { name: 'uuid',            version: cargoVersions.uuid,    license: 'MIT',       url: 'https://github.com/uuid-rs/uuid' },
+  { name: 'anyhow',          version: cargoVersions.anyhow,  license: 'MIT',       url: 'https://github.com/dtolnay/anyhow' },
+  { name: 'dirs',            version: cargoVersions.dirs,    license: 'MIT',       url: 'https://github.com/dirs-dev/dirs-rs' },
   { sectionKey: 'about.libsSection.js' },
   { name: '@tauri-apps/api', license: 'MIT',       url: 'https://tauri.app' },
 ];
@@ -43,7 +44,7 @@ function buildLibList() {
 
       const name = document.createElement('span');
       name.className = 'lib-name';
-      name.textContent = item.name;
+      name.textContent = item.version ? `${item.name} ${item.version}` : item.name;
 
       const badge = document.createElement('span');
       badge.className = 'lib-badge ' + (BADGE_CLASS[item.license] ?? 'badge-other');

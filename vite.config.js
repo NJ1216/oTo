@@ -1,7 +1,9 @@
 import { defineConfig } from 'vite';
 import { resolve } from 'path';
+import cargoMetaPlugin from './vite-plugin-cargo-meta.js';
 
 export default defineConfig({
+  plugins: [cargoMetaPlugin()],
   build: {
     rollupOptions: {
       input: {

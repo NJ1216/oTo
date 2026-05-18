@@ -1,7 +1,7 @@
 {
   "name": "oto",
   "private": true,
-  "version": "0.0.0",
+  "version": "26.5.16",
   "type": "module",
   "scripts": {
     "dev": "vite",

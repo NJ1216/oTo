@@ -59,6 +59,17 @@ jobs:
         run: cargo test
         working-directory: src-tauri
 
+      - name: バージョン同期チェック (package.json ↔ Cargo.toml)
+        run: |
+          PKG_VER=$(grep -m1 '"version"' package.json | sed 's/.*"version": *"\([^"]*\)".*/\1/')
+          CARGO_VER=$(grep -m1 '^version = ' src-tauri/Cargo.toml | sed 's/version = "\(.*\)"/\1/')
+          echo "package.json: $PKG_VER"
+          echo "Cargo.toml:   $CARGO_VER"
+          if [ "$PKG_VER" != "$CARGO_VER" ]; then
+            echo "::error::Version mismatch: package.json=$PKG_VER, Cargo.toml=$CARGO_VER"
+            exit 1
+          fi
+
 # ─────────────────────────────────────────────
 # Job 2: Windows ビルド
 # ─────────────────────────────────────────────
@@ -107,10 +118,59 @@ jobs:
           if-no-files-found: warn
 
 # ─────────────────────────────────────────────
-# Job 2: Draft Release 作成（タグ push 時のみ）
+# Job 3: macOS ビルド
+# ─────────────────────────────────────────────
+  build-mac:
+    runs-on: macos-14
+    needs: lint
+
+    steps:
+      - name: リポジトリをチェックアウト
+        uses: actions/checkout@v4
+
+      - name: pnpm セットアップ
+        uses: pnpm/action-setup@v4
+        with:
+          version: latest
+
+      - name: Node.js セットアップ
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'pnpm'
+
+      - name: Rust インストール
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Rust ビルドキャッシュ
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: './src-tauri -> target'
+          cache-on-failure: true
+
+      - name: JS パッケージインストール
+        run: pnpm install --frozen-lockfile
+
+      - name: Tauri ビルド（.app バンドル）
+        run: pnpm tauri build --bundles app
+
+      - name: .app を zip 化（シンボリックリンク保持）
+        run: |
+          cd src-tauri/target/release/bundle/macos
+          zip -r --symlinks oTo-macOS.zip oTo.app
+
+      - name: Artifact 保存
+        uses: actions/upload-artifact@v4
+        with:
+          name: oTo-macOS
+          path: src-tauri/target/release/bundle/macos/oTo-macOS.zip
+          if-no-files-found: warn
+
+# ─────────────────────────────────────────────
+# Job 4: Draft Release 作成（タグ push 時のみ）
 # ─────────────────────────────────────────────
   release:
-    needs: build
+    needs: [build, build-mac]
     if: startsWith(github.ref, 'refs/tags/')
     runs-on: ubuntu-latest
     permissions:
@@ -134,6 +194,7 @@ jobs:
             | ファイル | 対象OS |
             |----------|--------|
             | `oto.exe` | Windows（インストール不要・単体実行ファイル） |
+            | `oTo-macOS.zip` | macOS Apple Silicon（ARM64）/ 解凍後 oTo.app を起動 |
 
-            **macOS** のバイナリは別途リリースページにアップロードされます。
+            > **macOS ユーザーへ**: コード署名なしのため、初回起動時は右クリック → 「開く」を選択してください。
           files: artifacts/**
