@@ -1,33 +1,19 @@
 use std::path::{Path, PathBuf};
 use anyhow::{anyhow, Result};
-use tauri::AppHandle;
+use tauri::{AppHandle, Emitter, Manager};
 use tokio::sync::Semaphore;
 use crate::settings::{NameConflict, OutputDest, Settings};
 
-pub async fn ask_overwrite_dialog(app: &AppHandle, filename: &str, lang: &str) -> bool {
-    use tauri_plugin_dialog::{DialogExt, MessageDialogButtons};
-    let (tx, rx) = tokio::sync::oneshot::channel::<bool>();
-    let (msg, title, btn_ok, btn_cancel) = if lang.starts_with("en") {
-        (
-            format!("\"{}\" already exists. Overwrite?", filename),
-            "File Conflict",
-            "Overwrite",
-            "Save As",
-        )
-    } else {
-        (
-            format!("\"{}\" はすでに存在します。上書きしますか？", filename),
-            "ファイルの競合",
-            "上書き",
-            "別名保存",
-        )
-    };
-    app.dialog()
-        .message(msg)
-        .title(title)
-        .buttons(MessageDialogButtons::OkCancelCustom(btn_ok.into(), btn_cancel.into()))
-        .show(move |result| { let _ = tx.send(result); });
-    rx.await.unwrap_or(false)
+async fn ask_overwrite_dialog(app: &AppHandle, filename: &str) -> crate::OverwriteChoice {
+    let (tx, rx) = tokio::sync::oneshot::channel::<crate::OverwriteChoice>();
+    {
+        let state = app.state::<crate::AppState>();
+        *state.overwrite_tx.lock().unwrap() = Some(tx);
+    }
+    if let Some(w) = app.get_webview_window("main") {
+        w.emit("overwrite_confirm", filename).ok();
+    }
+    rx.await.unwrap_or(crate::OverwriteChoice::Cancel)
 }
 
 pub async fn resolve_output_path(
@@ -98,16 +84,18 @@ pub async fn resolve_output_path(
             let display = candidate.file_name()
                 .map(|n| n.to_string_lossy().into_owned())
                 .unwrap_or_else(|| filename.clone());
-            if ask_overwrite_dialog(app, &display, &settings.language).await {
-                return Ok(candidate); // 上書き
-            }
-            // 別名保存
-            let mut i = 1u32;
-            loop {
-                let name = format!("{}_{}.{}", stem, i, ext);
-                let path = output_dir.join(&name);
-                if !path.exists() { return Ok(path); }
-                i += 1;
+            match ask_overwrite_dialog(app, &display).await {
+                crate::OverwriteChoice::Overwrite => Ok(candidate),
+                crate::OverwriteChoice::Cancel => Err(anyhow!("__CANCELLED__")),
+                crate::OverwriteChoice::Rename => {
+                    let mut i = 1u32;
+                    loop {
+                        let name = format!("{}_{}.{}", stem, i, ext);
+                        let path = output_dir.join(&name);
+                        if !path.exists() { return Ok(path); }
+                        i += 1;
+                    }
+                }
             }
         }
         NameConflict::ForceOverwrite => Ok(candidate),

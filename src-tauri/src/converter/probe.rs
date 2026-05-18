@@ -76,14 +76,13 @@ pub async fn probe_file(path: &Path) -> Result<FileInfo, String> {
                                 }
                             }
                         }
-                        "video" => {
+                        "video"
                             if stream["disposition"]["attached_pic"].as_i64().unwrap_or(0) == 1
-                                && cover_art_stream_idx.is_none()
-                            {
-                                let codec = stream["codec_name"].as_str().unwrap_or("");
-                                if matches!(codec, "mjpeg" | "png") {
-                                    cover_art_stream_idx = Some(stream_idx);
-                                }
+                                && cover_art_stream_idx.is_none() =>
+                        {
+                            let codec = stream["codec_name"].as_str().unwrap_or("");
+                            if matches!(codec, "mjpeg" | "png") {
+                                cover_art_stream_idx = Some(stream_idx);
                             }
                         }
                         _ => {}
