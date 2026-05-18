@@ -115,6 +115,9 @@ jobs:
       - name: JS パッケージインストール
         run: pnpm install --frozen-lockfile
 
+      - name: フロントエンドをビルド
+        run: pnpm build
+
       - name: Tauri ビルド
         run: pnpm tauri build --no-bundle
 
@@ -159,6 +162,9 @@ jobs:
 
       - name: JS パッケージインストール
         run: pnpm install --frozen-lockfile
+
+      - name: フロントエンドをビルド
+        run: pnpm build
 
       - name: Tauri ビルド（.app バンドル）
         run: pnpm tauri build --bundles app
