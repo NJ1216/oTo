@@ -22,7 +22,6 @@ const statusEl   = document.getElementById('analyze-status');
 const btnPlayFromStart = document.getElementById('btn-play-from-start');
 const btnPlayLastTrim  = document.getElementById('btn-play-last-trim');
 const btnStop          = document.getElementById('btn-stop');
-const playbackBtns     = document.getElementById('playback-btns');
 const volumeSlider     = document.getElementById('volume-slider');
 const volumeValueEl    = document.getElementById('volume-value');
 const preplayInput     = document.getElementById('preplay-seconds');
@@ -53,7 +52,6 @@ let audioElement = null;
 let decodedWavPath = null;
 let currentWavTempPath = null;
 let isPlaying = false;
-let playbackMode = null;
 let volume = 1.0;
 let playbackProgress = 0;
 let playbackAnimFrame = null;
@@ -91,7 +89,7 @@ helpTrigger.addEventListener('mouseenter', () => {
   helpOverlay.classList.add('visible');
 });
 
-helpTrigger.addEventListener('mouseleave', (e) => {
+helpTrigger.addEventListener('mouseleave', () => {
   setTimeout(() => {
     if (!helpOverlay.matches(':hover') && !helpTrigger.matches(':hover')) {
       helpOverlay.classList.remove('visible');
@@ -364,7 +362,6 @@ function stopPlayback() {
     audioElement = null;
   }
   isPlaying = false;
-  playbackMode = null;
   playbackStopTime = 0;
   updatePlaybackButtons();
 }
@@ -408,7 +405,6 @@ function playFromTrimStart() {
 
   audioElement = audio;
   audio.currentTime = startTime;
-  playbackMode = 'from-trim-start';
   playbackStopTime = 0;
   isPlaying = true;
   updatePlaybackButtons();
@@ -437,7 +433,6 @@ function playLastTrim() {
 
   audioElement = audio;
   audio.currentTime = startTime;
-  playbackMode = 'last-trim';
   playbackStopTime = lastSilenceStart;
   isPlaying = true;
   updatePlaybackButtons();

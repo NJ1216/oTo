@@ -6,7 +6,7 @@
  *       呼ばれなくなるレースコンディション。
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 
 // ---- main.js の状態管理ロジックをそのまま移植したシミュレーション ----
 

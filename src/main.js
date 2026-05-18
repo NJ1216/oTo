@@ -30,7 +30,7 @@ const toast = document.getElementById('toast');
 async function init() {
   try {
     appSettings = await invoke('get_settings');
-  } catch (e) {
+  } catch (_) {
     appSettings = {
       lastMode: 'encode',
       lastFormat: 'mp3',
@@ -85,13 +85,41 @@ async function init() {
 
   await listen('silence_preview_opened', () => { silencePreviewVisible = true; });
   await listen('silence_preview_closed', () => { silencePreviewVisible = false; });
+  await listen('overwrite_confirm', async (event) => {
+    if (jobCancelled) {
+      await invoke('respond_overwrite', { choice: 'cancel' }).catch(console.error);
+      return;
+    }
+    showOverwriteDialog(event.payload);
+  });
 
+  // Cmd+Q (macOS) — ExitRequested はフロントエンドの onCloseRequested を経由しない
+  await listen('quit_requested', async () => {
+    if (isProcessing) {
+      // 上書き確認ダイアログが出ていたらキャンセル応答を送り、ブロック解除してからpause
+      if (isOverwriteDialogVisible()) {
+        hideOverwriteDialog();
+        await invoke('respond_overwrite', { choice: 'cancel' }).catch(console.error);
+      }
+      hidePauseDialog();
+      if (activeJobId) {
+        await invoke('pause_job', { jobId: activeJobId }).catch(console.error);
+      }
+      showQuitDialog();
+    } else {
+      await invoke('exit_app');
+    }
+  });
+
+  // ウィンドウの閉じるボタン（macOS 赤ボタン）
   appWindow.onCloseRequested(async (event) => {
     if (isProcessing) {
-      const confirmed = confirm(t('dialog.closeConfirm') || '変換中です。本当にキャンセルして閉じますか？');
-      if (!confirmed) {
-        event.preventDefault();
+      event.preventDefault();
+      hidePauseDialog();
+      if (activeJobId) {
+        await invoke('pause_job', { jobId: activeJobId }).catch(console.error);
       }
+      showQuitDialog();
     }
   });
 }
@@ -231,6 +259,7 @@ function registerDragDrop() {
 async function startConversion(paths) {
   if (isProcessing) return;
   isProcessing = true;
+  jobCancelled = false;
   setState('processing');
   setProgress(0);
 
@@ -381,11 +410,49 @@ function hidePauseDialog() {
   document.getElementById('pause-dialog').classList.add('hidden');
 }
 
+// --- Quit confirm dialog ---
+function showQuitDialog() {
+  document.getElementById('quit-confirm-dialog').classList.remove('hidden');
+}
+
+function hideQuitDialog() {
+  document.getElementById('quit-confirm-dialog').classList.add('hidden');
+}
+
+// --- Overwrite confirm dialog ---
+function showOverwriteDialog(filename) {
+  document.getElementById('overwrite-filename').textContent = filename;
+  document.getElementById('overwrite-dialog').classList.remove('hidden');
+}
+
+function hideOverwriteDialog() {
+  document.getElementById('overwrite-dialog').classList.add('hidden');
+}
+
+function isOverwriteDialogVisible() {
+  return !document.getElementById('overwrite-dialog').classList.contains('hidden');
+}
+
+async function cancelAllViaOverwrite() {
+  jobCancelled = true; // 先にフラグを立てて後続のoverwrite_confirmを自動却下
+  hideOverwriteDialog();
+  await invoke('respond_overwrite', { choice: 'cancel' }).catch(console.error);
+  if (activeJobId) {
+    const jobId = activeJobId;
+    activeJobId = null;
+    isProcessing = false;
+    setState('standby');
+    await invoke('cancel_job', { jobId }).catch(console.error);
+  }
+}
+
 // --- Misc event listeners ---
 function registerEventListeners() {
   document.addEventListener('keydown', async (e) => {
     if (e.key === 'Escape') {
-      if (activeJobId) {
+      if (isOverwriteDialogVisible()) {
+        await cancelAllViaOverwrite();
+      } else if (activeJobId) {
         await invoke('pause_job', { jobId: activeJobId }).catch(console.error);
         showPauseDialog();
       } else {
@@ -411,6 +478,40 @@ function registerEventListeners() {
       setState('standby');
       await invoke('cancel_job', { jobId }).catch(console.error);
     }
+  });
+
+  document.getElementById('btn-overwrite-ok').addEventListener('click', async () => {
+    hideOverwriteDialog();
+    await invoke('respond_overwrite', { choice: 'overwrite' }).catch(console.error);
+  });
+
+  document.getElementById('btn-overwrite-rename').addEventListener('click', async () => {
+    hideOverwriteDialog();
+    await invoke('respond_overwrite', { choice: 'rename' }).catch(console.error);
+  });
+
+  document.getElementById('btn-overwrite-cancel').addEventListener('click', async () => {
+    await cancelAllViaOverwrite();
+  });
+
+  document.getElementById('btn-quit-resume').addEventListener('click', async () => {
+    hideQuitDialog();
+    if (activeJobId) {
+      await invoke('resume_job', { jobId: activeJobId }).catch(console.error);
+    }
+  });
+
+  document.getElementById('btn-quit-close').addEventListener('click', async () => {
+    hideQuitDialog();
+    if (activeJobId) {
+      const jobId = activeJobId;
+      jobCancelled = true;
+      activeJobId = null;
+      isProcessing = false;
+      setState('standby');
+      await invoke('cancel_job', { jobId }).catch(console.error);
+    }
+    await invoke('exit_app');
   });
 }
 
