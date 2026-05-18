@@ -69,3 +69,10 @@ pub struct FileInfo {
     pub is_lossless: bool,
     pub bit_rate_bps: u64,
 }
+
+#[derive(Debug)]
+pub enum OverwriteChoice {
+    Overwrite,
+    Rename,
+    Cancel,
+}

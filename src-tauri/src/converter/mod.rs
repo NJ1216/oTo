@@ -9,7 +9,7 @@ mod types;
 pub use binary::ffmpeg_path;
 pub use file_collector::collect_audio_files;
 pub use silence::run_silence_detect;
-pub use types::{CompletionPayload, ConvertRequest, ProgressPayload};
+pub use types::{CompletionPayload, ConvertRequest, OverwriteChoice, ProgressPayload};
 
 use anyhow::{anyhow, Result};
 use std::path::{Path, PathBuf};

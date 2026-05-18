@@ -8,7 +8,7 @@ use tokio::sync::Mutex;
 mod converter;
 mod settings;
 
-use converter::{run_conversion, ConvertRequest};
+use converter::{run_conversion, ConvertRequest, OverwriteChoice};
 use settings::Settings;
 
 pub struct JobInfo {
@@ -20,6 +20,7 @@ pub struct JobInfo {
 pub struct AppState {
     pub jobs: Mutex<HashMap<String, JobInfo>>,
     pub is_converting: AtomicBool,
+    pub overwrite_tx: std::sync::Mutex<Option<tokio::sync::oneshot::Sender<OverwriteChoice>>>,
 }
 
 // --- Commands ---
@@ -460,6 +461,7 @@ pub fn run() {
     let state = AppState {
         jobs: Mutex::new(HashMap::new()),
         is_converting: AtomicBool::new(false),
+        overwrite_tx: std::sync::Mutex::new(None),
     };
 
     tauri::Builder::default()
@@ -481,20 +483,25 @@ pub fn run() {
             is_silence_preview_visible,
             get_waveform_data,
             decode_to_wav,
-                delete_temp_wav,
+            delete_temp_wav,
             get_silence_regions,
+            respond_overwrite,
+            exit_app,
         ])
         .setup(|app| {
             #[cfg(not(target_os = "macos"))]
             let _ = &app;
             #[cfg(target_os = "macos")]
             {
-                use tauri::menu::{MenuBuilder, PredefinedMenuItem, SubmenuBuilder, MenuItem};
+                use tauri::menu::{MenuBuilder, MenuItemBuilder, PredefinedMenuItem, SubmenuBuilder, MenuItem};
 
                 let h = app.handle();
 
                 // 「about oTo」クリックでカスタムウィンドウを開くメニュー項目
                 let about_item = MenuItem::with_id(h, "open_about", "oTo について", true, None::<&str>)?;
+                let quit_item = MenuItemBuilder::with_id("quit", "oTo を終了")
+                    .accelerator("CmdOrCtrl+Q")
+                    .build(h)?;
 
                 // アプリメニューのみ（File / Edit / View / Window / Help は含めない）
                 let app_menu = SubmenuBuilder::new(h, "oTo")
@@ -506,7 +513,7 @@ pub fn run() {
                     .item(&PredefinedMenuItem::hide_others(h, None)?)
                     .item(&PredefinedMenuItem::show_all(h, None)?)
                     .separator()
-                    .item(&PredefinedMenuItem::quit(h, None)?)
+                    .item(&quit_item)
                     .build()?;
 
                 let menu = MenuBuilder::new(h).item(&app_menu).build()?;
@@ -520,10 +527,57 @@ pub fn run() {
                 tauri::async_runtime::spawn(async move {
                     let _ = ensure_window(&app, "about", dev_url("about/about.html"), "oTo - About", 400.0, 460.0, false).await;
                 });
+            } else if event.id() == "quit" {
+                let is_conv = app
+                    .try_state::<AppState>()
+                    .map(|s| s.is_converting.load(std::sync::atomic::Ordering::SeqCst))
+                    .unwrap_or(false);
+                if is_conv {
+                    if let Some(w) = app.get_webview_window("main") {
+                        w.emit("quit_requested", ()).ok();
+                    }
+                } else {
+                    app.exit(0);
+                }
             }
         })
-        .run(tauri::generate_context!())
-        .expect("error while running tauri application");
+        .build(tauri::generate_context!())
+        .expect("error while building tauri application")
+        .run(|app, event| {
+            if let tauri::RunEvent::ExitRequested { api, .. } = event {
+                let is_conv = app
+                    .try_state::<AppState>()
+                    .map(|s| s.is_converting.load(std::sync::atomic::Ordering::SeqCst))
+                    .unwrap_or(false);
+                if is_conv {
+                    api.prevent_exit();
+                    if let Some(w) = app.get_webview_window("main") {
+                        w.emit("quit_requested", ()).ok();
+                    }
+                }
+            }
+        });
+}
+
+#[tauri::command]
+fn respond_overwrite(state: State<'_, AppState>, choice: String) {
+    let tx = state.overwrite_tx.lock().unwrap().take();
+    if let Some(tx) = tx {
+        let c = match choice.as_str() {
+            "overwrite" => OverwriteChoice::Overwrite,
+            "rename"    => OverwriteChoice::Rename,
+            _           => OverwriteChoice::Cancel,
+        };
+        tx.send(c).ok();
+    }
+}
+
+#[tauri::command]
+fn exit_app(app: AppHandle) {
+    if let Some(state) = app.try_state::<AppState>() {
+        state.is_converting.store(false, std::sync::atomic::Ordering::SeqCst);
+    }
+    app.exit(0);
 }
 
 #[cfg(test)]

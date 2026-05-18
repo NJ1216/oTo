@@ -4,8 +4,8 @@ use tauri::{AppHandle, Emitter, Manager};
 use tokio::sync::Semaphore;
 use crate::settings::{NameConflict, OutputDest, Settings};
 
-async fn ask_overwrite_dialog(app: &AppHandle, filename: &str) -> crate::OverwriteChoice {
-    let (tx, rx) = tokio::sync::oneshot::channel::<crate::OverwriteChoice>();
+async fn ask_overwrite_dialog(app: &AppHandle, filename: &str) -> super::OverwriteChoice {
+    let (tx, rx) = tokio::sync::oneshot::channel::<super::OverwriteChoice>();
     {
         let state = app.state::<crate::AppState>();
         *state.overwrite_tx.lock().unwrap() = Some(tx);
@@ -13,7 +13,7 @@ async fn ask_overwrite_dialog(app: &AppHandle, filename: &str) -> crate::Overwri
     if let Some(w) = app.get_webview_window("main") {
         w.emit("overwrite_confirm", filename).ok();
     }
-    rx.await.unwrap_or(crate::OverwriteChoice::Cancel)
+    rx.await.unwrap_or(super::OverwriteChoice::Cancel)
 }
 
 pub async fn resolve_output_path(
@@ -85,9 +85,9 @@ pub async fn resolve_output_path(
                 .map(|n| n.to_string_lossy().into_owned())
                 .unwrap_or_else(|| filename.clone());
             match ask_overwrite_dialog(app, &display).await {
-                crate::OverwriteChoice::Overwrite => Ok(candidate),
-                crate::OverwriteChoice::Cancel => Err(anyhow!("__CANCELLED__")),
-                crate::OverwriteChoice::Rename => {
+                super::OverwriteChoice::Overwrite => Ok(candidate),
+                super::OverwriteChoice::Cancel => Err(anyhow!("__CANCELLED__")),
+                super::OverwriteChoice::Rename => {
                     let mut i = 1u32;
                     loop {
                         let name = format!("{}_{}.{}", stem, i, ext);
