@@ -199,7 +199,7 @@ fn dev_url(path: &str) -> WebviewUrl {
 /// Helper to create a prod-mode URL for a given relative path.
 #[cfg(not(dev))]
 fn dev_url(path: &str) -> WebviewUrl {
-    WebviewUrl::App(path.into())
+    WebviewUrl::App(format!("src/{}", path).into())
 }
 
 async fn ensure_window(
