@@ -518,7 +518,15 @@ pub fn run() {
             // 過去セッションが残した一時ファイル (oto_preview_*.wav, oto_p*.txt, oto_wave_*.raw) を掃除
             cleanup_stale_temp_files();
             #[cfg(not(target_os = "macos"))]
-            let _ = &app;
+            if let Some(main_win) = app.get_webview_window("main") {
+                let app_handle = app.handle().clone();
+                main_win.on_window_event(move |event| {
+                    if matches!(event, tauri::WindowEvent::Destroyed) {
+                        cleanup_stale_temp_files();
+                        app_handle.exit(0);
+                    }
+                });
+            }
             #[cfg(target_os = "macos")]
             {
                 use tauri::menu::{MenuBuilder, MenuItemBuilder, PredefinedMenuItem, SubmenuBuilder, MenuItem};
