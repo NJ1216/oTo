@@ -27,7 +27,7 @@
         "enable": true,
         "scope": ["$TEMP/**"]
       },
-      "csp": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; media-src 'self' asset: blob:; connect-src ipc: 'self'"
+      "csp": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; media-src 'self' asset: https://asset.localhost blob:; connect-src ipc: 'self'"
     }
   },
   "bundle": {
