@@ -173,7 +173,7 @@ async function loadFile(path, name) {
         return;
       }
       currentWavTempPath = wavPath;
-      decodedWavPath = convertFileSrc(wavPath);
+      decodedWavPath = convertFileSrc(wavPath.replace(/\\/g, '/'));
       if (statusEl.textContent === t('silencePreview.decodingWav')) statusEl.textContent = '';
     } catch (e) {
       console.error('WAV decode failed:', e);
