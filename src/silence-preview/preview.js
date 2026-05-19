@@ -381,6 +381,10 @@ function createAudio() {
   const audio = new Audio(decodedWavPath);
   audio.volume = volume;
   audio.preload = 'auto';
+  // DEBUG: ロードエラーを画面表示
+  audio.onerror = () => {
+    statusEl.textContent = `[DBG] onerror code=${audio.error?.code} src=${decodedWavPath}`;
+  };
   return audio;
 }
 
@@ -423,7 +427,8 @@ function playFromTrimStart() {
     stopPlayback();
   };
 
-  audio.play().catch(() => {
+  audio.play().catch((err) => {
+    statusEl.textContent = `[DBG] play failed: ${err?.message ?? err} src=${decodedWavPath}`;
     stopPlayback();
   });
 
@@ -451,7 +456,8 @@ function playLastTrim() {
     stopPlayback();
   };
 
-  audio.play().catch(() => {
+  audio.play().catch((err) => {
+    statusEl.textContent = `[DBG] play failed: ${err?.message ?? err} src=${decodedWavPath}`;
     stopPlayback();
   });
 
