@@ -37,7 +37,9 @@ fn run_silence_detect_raw(path: &Path, db: f64, min_dur_secs: f64) -> (Vec<(f64,
     let filter = format!("silencedetect=noise={db}dB:duration={min_dur_secs:.4}");
 
     let mut cmd = std::process::Command::new(&ffmpeg);
-    cmd.args(["-i", &path.to_string_lossy(), "-af", &filter, "-f", "null", "-"])
+    cmd.arg("-i")
+       .arg(path)
+       .args(["-af", &filter, "-f", "null", "-"])
        .stderr(std::process::Stdio::piped());
     #[cfg(windows)]
     { use std::os::windows::process::CommandExt; cmd.creation_flags(0x08000000); }
