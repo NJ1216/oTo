@@ -1,6 +1,7 @@
 use std::path::Path;
+use std::sync::OnceLock;
 
-pub fn resolve_binary(name: &str) -> String {
+fn resolve_binary(name: &str) -> String {
     // Check PATH first via which/where
     #[cfg(unix)]
     {
@@ -17,7 +18,12 @@ pub fn resolve_binary(name: &str) -> String {
     }
     #[cfg(windows)]
     {
-        if let Ok(output) = std::process::Command::new("where").arg(name).output() {
+        // CREATE_NO_WINDOW を付けないと `where` のコンソールが一瞬表示される。
+        // ffmpeg 起動前に毎回これが見えていた「ちらつき」の原因。
+        use std::os::windows::process::CommandExt;
+        let mut cmd = std::process::Command::new("where");
+        cmd.arg(name).creation_flags(0x08000000);
+        if let Ok(output) = cmd.output() {
             if output.status.success() {
                 if let Ok(path) = String::from_utf8(output.stdout) {
                     let path = path.lines().next().unwrap_or("").trim().to_string();
@@ -39,8 +45,18 @@ pub fn resolve_binary(name: &str) -> String {
     name.to_string()
 }
 
-pub fn ffmpeg_path() -> String { resolve_binary("ffmpeg") }
-pub fn ffprobe_path() -> String { resolve_binary("ffprobe") }
+// アプリ生存期間中はパスをキャッシュする。
+// 変換のたびに ffmpeg_path() が呼ばれるため、毎回 `where`/`which` を起動すると
+// Windows ではちらつきが残るし、Unix でもプロセス起動コストが累積する。
+static FFMPEG_PATH: OnceLock<String> = OnceLock::new();
+static FFPROBE_PATH: OnceLock<String> = OnceLock::new();
+
+pub fn ffmpeg_path() -> String {
+    FFMPEG_PATH.get_or_init(|| resolve_binary("ffmpeg")).clone()
+}
+pub fn ffprobe_path() -> String {
+    FFPROBE_PATH.get_or_init(|| resolve_binary("ffprobe")).clone()
+}
 
 pub fn friendly_ffmpeg_error(e: &str) -> String {
     let lower = e.to_lowercase();

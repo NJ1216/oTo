@@ -55,11 +55,8 @@ function populateForm(s) {
   document.getElementById('mp3ChannelMode').value = s.mp3ChannelMode || 'auto';
 
   setPreset('aacPreset', s.aacPreset || '128');
-  const aacMode = s.aacMode || 'cbr';
-  document.querySelectorAll('input[name="aacMode"]').forEach((r) => { r.checked = r.value === aacMode; });
-  toggleCbrVbr('aac', aacMode);
+  // FFmpeg ビルトイン aac は VBR 非対応のため UI は CBR 固定
   document.getElementById('m4aBitrate').value = String(s.m4aBitrate || 128);
-  document.getElementById('aacVbrQuality').value = String(s.aacVbrQuality ?? 4);
   document.getElementById('aacSampleRate').value = String(s.aacSampleRate ?? 0);
   document.getElementById('aacChannels').value = String(s.aacChannels ?? 0);
 
@@ -116,10 +113,9 @@ function toggleCustomDetail(selectId, show) {
 
 document.getElementById('outputDest').addEventListener('change', updateCustomPathRow);
 
-['mp3', 'aac'].forEach((fmt) => {
-  document.querySelectorAll(`input[name="${fmt}Mode"]`).forEach((r) => {
-    r.addEventListener('change', (e) => toggleCbrVbr(fmt, e.target.value));
-  });
+// aac は VBR 非対応のため mp3 のみ CBR/VBR トグルを扱う
+document.querySelectorAll('input[name="mp3Mode"]').forEach((r) => {
+  r.addEventListener('change', (e) => toggleCbrVbr('mp3', e.target.value));
 });
 
 document.querySelectorAll('#encode-fmt-group .fmt-toggle-btn').forEach((btn) => {
@@ -180,9 +176,10 @@ function collectFormValues() {
     mp3SampleRate: int('mp3SampleRate'),
     mp3ChannelMode: str('mp3ChannelMode'),
     aacPreset: str('aacPreset'),
-    aacMode: radio('aacMode', 'cbr'),
+    // aacMode/aacVbrQuality はビルトイン aac エンコーダで効かないため固定値を渡す
+    aacMode: 'cbr',
     m4aBitrate: int('m4aBitrate', 128),
-    aacVbrQuality: int('aacVbrQuality', 4),
+    aacVbrQuality: 4,
     aacSampleRate: int('aacSampleRate'),
     aacChannels: int('aacChannels'),
     opusPreset: str('opusPreset'),
@@ -210,7 +207,11 @@ function collectFormValues() {
 }
 
 document.getElementById('save-btn').addEventListener('click', async () => {
-  await invoke('save_settings', { s: { ...settings, ...collectFormValues() } });
+  // 設定ウィンドウ起動後にプレビュー側で更新された値（silenceTrimDb 等）を巻き戻さない
+  // ようにするため、保存直前に最新を再取得してからフォーム値をマージする。
+  let latest = settings;
+  try { latest = await invoke('get_settings'); } catch (_) {}
+  await invoke('save_settings', { s: { ...latest, ...collectFormValues() } });
   await emit('settings_updated');
   await getCurrentWebviewWindow().close();
 });

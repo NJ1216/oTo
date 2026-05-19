@@ -82,27 +82,20 @@ function applyI18n() {
 }
 
 // --- Help overlay ---
+// trigger + overlay を 1 つのホットゾーンとして扱う。setTimeout 不要・タイマ競合無し。
 const helpTrigger = document.getElementById('help-trigger');
 const helpOverlay = document.getElementById('help-overlay');
 
-helpTrigger.addEventListener('mouseenter', () => {
-  helpOverlay.classList.add('visible');
-});
+const showHelp = () => helpOverlay.classList.add('visible');
+const hideHelp = () => helpOverlay.classList.remove('visible');
 
-helpTrigger.addEventListener('mouseleave', () => {
-  setTimeout(() => {
-    if (!helpOverlay.matches(':hover') && !helpTrigger.matches(':hover')) {
-      helpOverlay.classList.remove('visible');
-    }
-  }, 100);
+helpTrigger.addEventListener('mouseenter', showHelp);
+helpOverlay.addEventListener('mouseenter', showHelp);
+helpTrigger.addEventListener('mouseleave', (e) => {
+  if (!helpOverlay.contains(e.relatedTarget)) hideHelp();
 });
-
-helpOverlay.addEventListener('mouseenter', () => {
-  helpOverlay.classList.add('visible');
-});
-
-helpOverlay.addEventListener('mouseleave', () => {
-  helpOverlay.classList.remove('visible');
+helpOverlay.addEventListener('mouseleave', (e) => {
+  if (!helpTrigger.contains(e.relatedTarget)) hideHelp();
 });
 
 // --- Drag & Drop ---
@@ -132,6 +125,13 @@ let loadGeneration = 0;
 async function loadFile(path, name) {
   const gen = ++loadGeneration;
 
+  // 連続ドロップで前回の状態が残らないようにまずプレイバック・選択状態をクリア
+  stopPlayback();
+  playbackProgress = 0;
+  selOverlay.style.display = 'none';
+  isDragSelecting = false;
+  isMiddleScrolling = false;
+
   currentPath    = path;
   waveformLevels = [];
   silenceRegions = [];
@@ -146,8 +146,6 @@ async function loadFile(path, name) {
   loadingEl.classList.remove('hidden');
   clearCanvas();
   statusEl.textContent = '';
-
-  stopPlayback();
   if (currentWavTempPath) {
     invoke('delete_temp_wav', { path: currentWavTempPath }).catch(() => {});
     currentWavTempPath = null;
@@ -331,11 +329,23 @@ async function runAnalyze() {
   }
 }
 
-[dbInput, durInput].forEach((el) => {
-  el.addEventListener('input', () => {
-    if (waveformLevels.length > 0) scheduleAnalyze();
-  });
+function clampInput(el, min, max, fallback) {
+  let v = parseFloat(el.value);
+  if (Number.isNaN(v)) v = fallback;
+  if (v < min) v = min;
+  if (v > max) v = max;
+  if (String(v) !== el.value) el.value = String(v);
+  return v;
+}
+
+dbInput.addEventListener('input', () => {
+  if (waveformLevels.length > 0) scheduleAnalyze();
 });
+dbInput.addEventListener('change', () => clampInput(dbInput, -100, -1, -80));
+durInput.addEventListener('input', () => {
+  if (waveformLevels.length > 0) scheduleAnalyze();
+});
+durInput.addEventListener('change', () => clampInput(durInput, 10, 2000, 50));
 
 // --- Playback ---
 function updatePlaybackButtons() {
@@ -486,7 +496,17 @@ volumeSlider.addEventListener('input', () => {
 const btnCancel = document.getElementById('btn-cancel');
 const btnApply  = document.getElementById('btn-apply');
 
+async function cleanupTempWav() {
+  if (currentWavTempPath) {
+    const p = currentWavTempPath;
+    currentWavTempPath = null;
+    try { await invoke('delete_temp_wav', { path: p }); } catch (_) {}
+  }
+}
+
 btnCancel.addEventListener('click', async () => {
+  stopPlayback();
+  await cleanupTempWav();
   const win = getCurrentWebviewWindow();
   await win.close();
 });
@@ -498,8 +518,20 @@ btnApply.addEventListener('click', async () => {
     s.silenceTrimDurationMs = parseInt(durInput.value, 10) || 50;
     await invoke('save_settings', { s });
   } catch (_) {}
+  stopPlayback();
+  await cleanupTempWav();
   const win = getCurrentWebviewWindow();
   await win.close();
+});
+
+// X ボタンや Cmd+W で閉じた場合のリーク防止
+window.addEventListener('beforeunload', () => {
+  // beforeunload では await できないが、Tauri は IPC を発火だけして返るため、
+  // delete_temp_wav は best-effort で実行される
+  if (currentWavTempPath) {
+    invoke('delete_temp_wav', { path: currentWavTempPath }).catch(() => {});
+    currentWavTempPath = null;
+  }
 });
 
 // --- Keyboard shortcuts ---

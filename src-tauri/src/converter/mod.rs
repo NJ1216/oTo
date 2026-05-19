@@ -15,7 +15,7 @@ use anyhow::{anyhow, Result};
 use std::path::{Path, PathBuf};
 use std::process::Stdio;
 use std::sync::Arc;
-use tauri::{AppHandle, Emitter};
+use tauri::{AppHandle, Emitter, Manager};
 use tokio::io::{AsyncBufReadExt, BufReader};
 use tokio::sync::{watch, Semaphore};
 use tokio::task::JoinSet;
@@ -64,6 +64,9 @@ async fn convert_one(
                 if let Some(backup) = &self.backup {
                     let _ = std::fs::rename(backup, &self.path);
                 }
+            } else if let Some(backup) = &self.backup {
+                // 成功時は退避していた旧ファイルを破棄する
+                let _ = std::fs::remove_file(backup);
             }
         }
     }
@@ -174,6 +177,17 @@ async fn convert_one(
         args.push(p.to_string_lossy().into_owned());
         p
     };
+    // Windows: キャンセル等でループを抜けても確実に oto_p<id>.txt を削除する RAII ガード
+    #[cfg(windows)]
+    struct ProgressFileGuard(std::path::PathBuf);
+    #[cfg(windows)]
+    impl Drop for ProgressFileGuard {
+        fn drop(&mut self) {
+            let _ = std::fs::remove_file(&self.0);
+        }
+    }
+    #[cfg(windows)]
+    let _progress_guard = ProgressFileGuard(progress_path.clone());
     args.push("-nostats".into());
 
     // args[..3] = [-threads, N, -y]; args[3..] = [-map_metadata … -nostats]
@@ -354,7 +368,7 @@ pub async fn run_conversion(
     job_id: String,
     request: ConvertRequest,
     settings: Settings,
-    pgids: Arc<tokio::sync::Mutex<Vec<i32>>>,
+    pgids: Arc<std::sync::Mutex<Vec<i32>>>,
 ) {
     let format = if request.mode == "decode" {
         // DECODE モードは wav または aiff のみ許可、それ以外はデフォルト wav
@@ -536,9 +550,13 @@ pub async fn run_conversion(
                 file_duration,
                 threads_per_job,
                 move |ratio| { let _ = progress_tx.send(ratio); },
-                move |pid| {
-                    let p = pgids_for_spawn.clone();
-                    tokio::spawn(async move { p.lock().await.push(pid as i32); });
+                {
+                    // cancel_job が pid 登録より先に走ると ffmpeg を kill できなくなる。
+                    // std::sync::Mutex のため、即座に同期的に push する。
+                    let pgids_for_pid = pgids_for_spawn.clone();
+                    move |pid| {
+                        pgids_for_pid.lock().unwrap().push(pid as i32);
+                    }
                 },
             )
             .await;
@@ -578,8 +596,11 @@ pub async fn run_conversion(
     let error_count = results.iter().filter(|r| !r.success && !r.skipped).count();
 
     // 変換完了後に出力先をファイルマネージャで表示
+    // ドロップ順を保つため入力パスでソートしてから先頭の成功ファイルを表示
     if settings.open_in_finder {
-        if let Some(first_success) = results.iter().find(|r| r.success) {
+        let mut successes: Vec<&FR> = results.iter().filter(|r| r.success).collect();
+        successes.sort_by(|a, b| a.input_path.cmp(&b.input_path));
+        if let Some(first_success) = successes.first() {
             let path = &first_success.output_path;
             #[cfg(target_os = "macos")]
             let _ = tokio::process::Command::new("open").arg("-R").arg(path).spawn();
@@ -606,6 +627,13 @@ pub async fn run_conversion(
         },
     ).is_err() {
         eprintln!("emit progress failed");
+    }
+
+    // conversion_complete を emit する前に is_converting を解除する。
+    // この順を逆にするとフロントが完了処理→ユーザーが Cmd+Q→Rust が is_converting=true を
+    // 検出して終了確認ダイアログを誤って出す競合が起きる。
+    if let Some(state) = app.try_state::<crate::AppState>() {
+        state.is_converting.store(false, std::sync::atomic::Ordering::SeqCst);
     }
 
     if app.emit(

@@ -7,7 +7,8 @@ edition = "2021"
 
 [lib]
 name = "oto_lib"
-crate-type = ["staticlib", "cdylib", "rlib"]
+# 静的ライブラリ / 共有ライブラリ用途は無いため rlib のみで十分
+crate-type = ["rlib"]
 
 [[bin]]
 name = "oto"

@@ -13,7 +13,9 @@ use settings::Settings;
 
 pub struct JobInfo {
     pub handle: tokio::task::JoinHandle<()>,
-    pub pgids: Arc<Mutex<Vec<i32>>>,
+    /// 内部は短時間しかロックされず await を跨がないため std::sync::Mutex を使う。
+    /// tokio::sync::Mutex だと on_pid 同期登録が困難 (blocking_lock がランタイム内でパニックする)。
+    pub pgids: Arc<std::sync::Mutex<Vec<i32>>>,
     pub paused: AtomicBool,
 }
 
@@ -33,7 +35,7 @@ async fn convert_files(
     request: ConvertRequest,
 ) -> Result<(), String> {
     let current_settings = settings::load_settings(&app).map_err(|e| e.to_string())?;
-    let pgids: Arc<Mutex<Vec<i32>>> = Arc::new(Mutex::new(vec![]));
+    let pgids: Arc<std::sync::Mutex<Vec<i32>>> = Arc::new(std::sync::Mutex::new(vec![]));
 
     state.is_converting.store(true, Ordering::SeqCst);
     let job_id_clone = job_id.clone();
@@ -44,8 +46,10 @@ async fn convert_files(
 
     let handle = tokio::spawn(async move {
         run_conversion(app_clone, job_id_clone, request, current_settings, pgids_for_conv).await;
+        // 完了通知は run_conversion 内で先に emit 済み。後始末は順次行う。
+        // is_converting は run_conversion 終了直後 (emit 直前) に解除済みなので
+        // ここでは jobs マップからの除去のみで十分。
         app_for_cleanup.state::<AppState>().jobs.lock().await.remove(&job_id_for_cleanup);
-        app_for_cleanup.state::<AppState>().is_converting.store(false, Ordering::SeqCst);
     });
 
     state.jobs.lock().await.insert(job_id.clone(), JobInfo { handle, pgids, paused: AtomicBool::new(false) });
@@ -62,7 +66,7 @@ async fn cancel_job(
         job.handle.abort();
         #[cfg(unix)]
         {
-            let pgids = job.pgids.lock().await;
+            let pgids = job.pgids.lock().unwrap();
             for &pgid in pgids.iter() {
                 let ret = unsafe { libc::kill(-pgid, libc::SIGKILL) };
                 if ret != 0 {
@@ -74,7 +78,7 @@ async fn cancel_job(
         {
             use windows_sys::Win32::Foundation::CloseHandle;
             use windows_sys::Win32::System::Threading::{OpenProcess, TerminateProcess, PROCESS_TERMINATE};
-            let pids = job.pgids.lock().await;
+            let pids = job.pgids.lock().unwrap();
             for &pid in pids.iter() {
                 unsafe {
                     let handle = OpenProcess(PROCESS_TERMINATE, 0, pid as u32);
@@ -101,13 +105,13 @@ async fn pause_job(
         if job.paused.swap(true, Ordering::SeqCst) { return Ok(()); }
         #[cfg(unix)]
         {
-            let pgids = job.pgids.lock().await;
+            let pgids = job.pgids.lock().unwrap();
             for &pgid in pgids.iter() {
                 unsafe { libc::kill(-pgid, libc::SIGSTOP); }
             }
         }
         #[cfg(windows)]
-        suspend_resume_windows_processes(&job.pgids, true).await;
+        suspend_resume_windows_processes(&job.pgids, true);
     }
     Ok(())
 }
@@ -122,21 +126,21 @@ async fn resume_job(
         if !job.paused.swap(false, Ordering::SeqCst) { return Ok(()); }
         #[cfg(unix)]
         {
-            let pgids = job.pgids.lock().await;
+            let pgids = job.pgids.lock().unwrap();
             for &pgid in pgids.iter() {
                 unsafe { libc::kill(-pgid, libc::SIGCONT); }
             }
         }
         #[cfg(windows)]
-        suspend_resume_windows_processes(&job.pgids, false).await;
+        suspend_resume_windows_processes(&job.pgids, false);
     }
     Ok(())
 }
 
 /// Windows: 対象プロセスの全スレッドを一時停止または再開する
 #[cfg(windows)]
-async fn suspend_resume_windows_processes(
-    pids: &Arc<Mutex<Vec<i32>>>,
+fn suspend_resume_windows_processes(
+    pids: &Arc<std::sync::Mutex<Vec<i32>>>,
     suspend: bool,
 ) {
     use windows_sys::Win32::Foundation::{CloseHandle, INVALID_HANDLE_VALUE};
@@ -145,7 +149,7 @@ async fn suspend_resume_windows_processes(
     };
     use windows_sys::Win32::System::Threading::{OpenThread, ResumeThread, SuspendThread, THREAD_SUSPEND_RESUME};
 
-    let pids_guard = pids.lock().await;
+    let pids_guard = pids.lock().unwrap();
     for &pid in pids_guard.iter() {
         unsafe {
             let snapshot = CreateToolhelp32Snapshot(TH32CS_SNAPTHREAD, 0);
@@ -445,10 +449,32 @@ async fn get_silence_regions(path: String, db: f64, duration_ms: u32) -> Result<
 
 #[tauri::command]
 fn open_url(url: String) -> Result<(), String> {
+    // 信頼できる http(s) / mailto スキームのみ許可し、cmd 引数注入を防ぐ
+    let lower = url.to_ascii_lowercase();
+    let scheme_ok = lower.starts_with("http://")
+        || lower.starts_with("https://")
+        || lower.starts_with("mailto:");
+    if !scheme_ok {
+        return Err("unsupported url scheme".into());
+    }
+    if url.chars().any(|c| c == '"' || c == '\n' || c == '\r' || c == '\0') {
+        return Err("invalid characters in url".into());
+    }
     #[cfg(target_os = "macos")]
     std::process::Command::new("open").arg(&url).spawn().map_err(|e| e.to_string())?;
     #[cfg(target_os = "windows")]
-    std::process::Command::new("cmd").args(["/C", "start", "", &url]).spawn().map_err(|e| e.to_string())?;
+    {
+        // `cmd start` は引数に空白や `&` を含むと壊れるため、URL を引用符で包む。
+        // 第 2 引数の `""` は start のウィンドウタイトルプレースホルダ。
+        // CREATE_NO_WINDOW で cmd 自体のコンソール表示を抑止する。
+        use std::os::windows::process::CommandExt;
+        let quoted = format!("\"{}\"", url);
+        std::process::Command::new("cmd")
+            .args(["/C", "start", "", &quoted])
+            .creation_flags(0x08000000)
+            .spawn()
+            .map_err(|e| e.to_string())?;
+    }
     #[cfg(target_os = "linux")]
     std::process::Command::new("xdg-open").arg(&url).spawn().map_err(|e| e.to_string())?;
     Ok(())
@@ -489,6 +515,8 @@ pub fn run() {
             exit_app,
         ])
         .setup(|app| {
+            // 過去セッションが残した一時ファイル (oto_preview_*.wav, oto_p*.txt, oto_wave_*.raw) を掃除
+            cleanup_stale_temp_files();
             #[cfg(not(target_os = "macos"))]
             let _ = &app;
             #[cfg(target_os = "macos")]
@@ -534,6 +562,10 @@ pub fn run() {
                     .unwrap_or(false);
                 if is_conv {
                     if let Some(w) = app.get_webview_window("main") {
+                        // 非表示状態だとダイアログが見えず詰むため、必ず前面に出す
+                        let _ = w.show();
+                        let _ = w.unminimize();
+                        let _ = w.set_focus();
                         w.emit("quit_requested", ()).ok();
                     }
                 } else {
@@ -552,6 +584,9 @@ pub fn run() {
                 if is_conv {
                     api.prevent_exit();
                     if let Some(w) = app.get_webview_window("main") {
+                        let _ = w.show();
+                        let _ = w.unminimize();
+                        let _ = w.set_focus();
                         w.emit("quit_requested", ()).ok();
                     }
                 }
@@ -577,7 +612,25 @@ fn exit_app(app: AppHandle) {
     if let Some(state) = app.try_state::<AppState>() {
         state.is_converting.store(false, std::sync::atomic::Ordering::SeqCst);
     }
+    cleanup_stale_temp_files();
     app.exit(0);
+}
+
+/// アプリ起動時・終了時に呼び、temp ディレクトリに残った oTo 用一時ファイルを除去する。
+/// クラッシュやキャンセル時の SIGKILL で削除されなかったファイルもここで掃除する。
+fn cleanup_stale_temp_files() {
+    let dir = std::env::temp_dir();
+    let Ok(entries) = std::fs::read_dir(&dir) else { return };
+    for entry in entries.flatten() {
+        let name = entry.file_name();
+        let name = name.to_string_lossy();
+        let is_target = (name.starts_with("oto_preview_") && name.ends_with(".wav"))
+            || (name.starts_with("oto_p") && name.ends_with(".txt"))
+            || (name.starts_with("oto_wave_") && name.ends_with(".raw"));
+        if is_target {
+            let _ = std::fs::remove_file(entry.path());
+        }
+    }
 }
 
 #[cfg(test)]

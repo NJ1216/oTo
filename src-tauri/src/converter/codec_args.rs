@@ -25,13 +25,12 @@ fn build_mp3_args(settings: &Settings) -> Vec<String> {
 }
 
 fn build_aac_args(settings: &Settings) -> Vec<String> {
+    // FFmpeg のビルトイン `aac` エンコーダは `-vbr` フラグが効かない
+    // (libfdk_aac 専用)。設定上 VBR が選ばれていても CBR(ビットレート指定) に
+    // フォールバックする。VBR Quality は m4a_bitrate にマップせず無視する。
     let mut args = vec!["-c:a".into(), "aac".into()];
     if settings.aac_preset == "custom" {
-        if settings.aac_mode == "vbr" {
-            args.extend(["-vbr".into(), settings.aac_vbr_quality.to_string()]);
-        } else {
-            args.extend(["-b:a".into(), format!("{}k", settings.m4a_bitrate)]);
-        }
+        args.extend(["-b:a".into(), format!("{}k", settings.m4a_bitrate)]);
         if settings.aac_sample_rate > 0 {
             args.extend(["-ar".into(), settings.aac_sample_rate.to_string()]);
         }
@@ -171,14 +170,17 @@ mod tests {
     }
 
     #[test]
-    fn aac_custom_vbr_uses_vbr_flag() {
+    fn aac_custom_vbr_falls_back_to_cbr() {
+        // ビルトイン aac は -vbr 非対応なので、VBR 選択時も CBR にフォールバックする
         let mut s = Settings::default();
         s.aac_preset = "custom".into();
         s.aac_mode = "vbr".into();
         s.aac_vbr_quality = 3;
+        s.m4a_bitrate = 160;
         let args = build_codec_args("aac", &s, &default_info());
-        assert!(args.contains(&"-vbr".to_string()));
-        assert!(args.contains(&"3".to_string()));
+        assert!(!args.contains(&"-vbr".to_string()));
+        assert!(args.contains(&"-b:a".to_string()));
+        assert!(args.contains(&"160k".to_string()));
     }
 
     #[test]

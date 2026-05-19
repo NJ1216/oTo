@@ -147,10 +147,7 @@
         </div>
         <div class="custom-detail" id="aacCustom">
           <div class="custom-inner">
-            <div class="full-row mode-row">
-              <label><input type="radio" name="aacMode" value="cbr" checked /> <span data-i18n="settings.custom.cbr">CBR</span></label>
-              <label><input type="radio" name="aacMode" value="vbr" /> <span data-i18n="settings.custom.vbr">VBR</span></label>
-            </div>
+            <!-- FFmpeg ビルトイン aac は VBR 非対応 (libfdk_aac 専用) のため CBR のみ提供 -->
             <div id="aacCbrRows" class="full-row inner-grid">
               <label data-i18n="settings.custom.bitrate">ビットレート (kbps)</label>
               <div class="select-wrap">
@@ -167,18 +164,6 @@
                   <option value="224">224 kbps</option>
                   <option value="256">256 kbps</option>
                   <option value="320">320 kbps</option>
-                </select>
-              </div>
-            </div>
-            <div id="aacVbrRows" class="full-row inner-grid" style="display:none">
-              <label data-i18n="settings.custom.vbrQuality">VBR Quality</label>
-              <div class="select-wrap">
-                <select id="aacVbrQuality">
-                  <option value="1">1 (low)</option>
-                  <option value="2">2</option>
-                  <option value="3">3</option>
-                  <option value="4">4</option>
-                  <option value="5">5 (high)</option>
                 </select>
               </div>
             </div>

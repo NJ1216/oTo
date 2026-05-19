@@ -2,14 +2,35 @@ import { readFileSync } from 'fs';
 import { resolve } from 'path';
 
 function parseCargoVersions(toml) {
+  // [dependencies] / [target.*.dependencies] / [build-dependencies] のみを対象にし、
+  // [package] の name/description/edition 等を拾わないようにする。
   const versions = {};
-  // name = { version = "x.y", ... }
-  const tableRe = /^([\w-]+)\s*=\s*\{[^}]*version\s*=\s*"([^"]+)"/gm;
-  let m;
-  while ((m = tableRe.exec(toml)) !== null) versions[m[1]] = m[2];
-  // name = "x.y"
-  const simpleRe = /^([\w-]+)\s*=\s*"([^"]+)"/gm;
-  while ((m = simpleRe.exec(toml)) !== null) if (!versions[m[1]]) versions[m[1]] = m[2];
+  const sectionRe = /^\[(?<section>[^\]]+)\]\s*$/gm;
+  const depSections = [];
+  let s;
+  while ((s = sectionRe.exec(toml)) !== null) {
+    const name = s.groups.section.trim();
+    if (name === 'dependencies' || name === 'build-dependencies' || /\.dependencies$/.test(name)) {
+      depSections.push({ start: s.index + s[0].length });
+    }
+  }
+  for (let i = 0; i < depSections.length; i++) {
+    let end = toml.length;
+    const nextSectionRe = /^\[[^\]]+\]\s*$/gm;
+    nextSectionRe.lastIndex = depSections[i].start;
+    const next = nextSectionRe.exec(toml);
+    if (next) end = next.index;
+    depSections[i].end = end;
+  }
+
+  for (const { start, end } of depSections) {
+    const body = toml.slice(start, end);
+    const tableRe = /^([\w-]+)\s*=\s*\{[^}]*version\s*=\s*"([^"]+)"/gm;
+    let m;
+    while ((m = tableRe.exec(body)) !== null) versions[m[1]] = m[2];
+    const simpleRe = /^([\w-]+)\s*=\s*"([^"]+)"\s*$/gm;
+    while ((m = simpleRe.exec(body)) !== null) if (!versions[m[1]]) versions[m[1]] = m[2];
+  }
   return versions;
 }
 

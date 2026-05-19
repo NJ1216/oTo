@@ -58,8 +58,9 @@ async function init() {
   registerEventListeners();
 
   await listen('progress', (event) => {
-    const { percent } = event.payload;
-    if (isProcessing) {
+    const { percent, jobId } = event.payload;
+    // 旧ジョブの遅延した progress を取りこぼさないようにジョブ ID で照合
+    if (isProcessing && (!jobId || jobId === activeJobId)) {
       setProgress(percent);
     }
   });
@@ -69,7 +70,8 @@ async function init() {
       jobCancelled = false;
       return;
     }
-    const { successCount, errorCount, results } = event.payload;
+    const { successCount, errorCount, results, jobId } = event.payload;
+    if (jobId && activeJobId && jobId !== activeJobId) return;
     isProcessing = false;
     activeJobId = null;
     setState('standby');
@@ -85,6 +87,9 @@ async function init() {
 
   await listen('silence_preview_opened', () => { silencePreviewVisible = true; });
   await listen('silence_preview_closed', () => { silencePreviewVisible = false; });
+
+  // HMR/リロード時に silence-preview が既に開いている可能性があるため初期同期する
+  try { silencePreviewVisible = await invoke('is_silence_preview_visible'); } catch (_) {}
   await listen('overwrite_confirm', async (event) => {
     if (jobCancelled) {
       await invoke('respond_overwrite', { choice: 'cancel' }).catch(console.error);
@@ -325,6 +330,14 @@ function shortenPath(p) {
 }
 
 function showCompletionToast(successCount, errorCount, results) {
+  // "__CANCELLED__" はユーザーが上書き確認ダイアログで中止を選んだ印で、UI 上はエラー扱いしない
+  const sanitized = (results ?? []).map((r) =>
+    r.error === '__CANCELLED__' ? { ...r, success: false, skipped: true, error: null } : r
+  );
+  const adjErrorCount = sanitized.filter((r) => !r.success && !r.skipped).length;
+  errorCount = adjErrorCount;
+  results = sanitized;
+
   if (successCount === 0 && errorCount === 0) {
     showToast(t('toast.noFiles'), 'warning', 4000);
     return;

@@ -37,7 +37,9 @@ pub fn common_ancestor(paths: &[PathBuf]) -> Option<PathBuf> {
 }
 
 // 同ディレクトリ内に拡張子違いの同名ファイルが存在する場合、最良ソースを1つ選ぶ。
-// 優先度: wav/aiff(PCM) > flac > alac(.m4a) > 非可逆ファイルの最高ビットレート
+// 優先度: wav/aiff(PCM) > flac > その他のロスレス(ALAC 等) > 非可逆ファイルの最高ビットレート
+// 「.m4a」拡張子は AAC・ALAC 両方で使われるため、ロスレス判定は probe で得た
+// codec_name から導出される `info.is_lossless` を使用し、拡張子だけでは判定しない。
 pub fn select_best_sources(
     files: Vec<(PathBuf, FileInfo)>,
 ) -> (Vec<(PathBuf, FileInfo)>, Vec<PathBuf>) {
