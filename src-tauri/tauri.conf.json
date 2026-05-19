@@ -5,6 +5,7 @@
   "identifier": "com.NJ1216.oto",
   "build": {
     "beforeDevCommand": "pnpm dev",
+    "beforeBuildCommand": "pnpm build",
     "frontendDist": "../dist",
     "devUrl": "http://localhost:1420"
   },
