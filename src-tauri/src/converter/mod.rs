@@ -22,7 +22,7 @@ use tokio::task::JoinSet;
 
 use crate::settings::{OutputDest, Settings, SourceFileAction};
 use codec_args::build_codec_args;
-use file_collector::{common_ancestor, select_best_sources};
+use file_collector::{common_ancestor, select_best_from_group, stem_key};
 use output::resolve_output_path;
 use probe::probe_file;
 use silence::detect_boundary_silence;
@@ -412,6 +412,24 @@ fn has_network_input(paths: &[String]) -> bool {
     paths.iter().any(|p| is_path_on_network(Path::new(p)))
 }
 
+/// AppState のログバッファにエントリを追加する（最大300件、古いものを自動削除）
+fn push_conv_log(app: &AppHandle, file_name: String, status: &str, error: Option<String>) {
+    if let Some(state) = app.try_state::<crate::AppState>() {
+        let ts_ms = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_millis() as u64)
+            .unwrap_or(0);
+        let mut log = state.conv_log.lock().unwrap();
+        if log.len() >= 300 { log.pop_front(); }
+        log.push_back(crate::ConvLogEntry {
+            ts_ms,
+            file_name,
+            status: status.to_string(),
+            error,
+        });
+    }
+}
+
 // --- Main conversion runner ---
 
 pub async fn run_conversion(
@@ -420,6 +438,7 @@ pub async fn run_conversion(
     request: ConvertRequest,
     settings: Settings,
     pgids: Arc<std::sync::Mutex<Vec<i32>>>,
+    memory_used: Arc<AtomicUsize>,
 ) {
     let format = if request.mode == "decode" {
         // DECODE モードは wav または aiff のみ許可、それ以外はデフォルト wav
@@ -482,6 +501,10 @@ pub async fn run_conversion(
     let job_id = Arc::new(job_id);
     // ネットワーク入力を検出（macOS/Linux/Windowsでマウント種別を判定）
     let is_network = has_network_input(&request.paths);
+    // アクティビティモニター向けにネットワークフラグを AppState へ書き込む
+    if let Some(state) = app.try_state::<crate::AppState>() {
+        state.is_network_conv.store(is_network, std::sync::atomic::Ordering::Relaxed);
+    }
     // CPU並列数: 常にユーザー設定値を使用（ネットワーク時も変換は並列）
     let cpu_parallel = settings.parallel_count.max(1);
     // I/O並列数: ネットワーク時はシリアル（帯域飽和防止）、ローカルは並列
@@ -492,106 +515,116 @@ pub async fn run_conversion(
     let sem = Arc::new(Semaphore::new(cpu_parallel));
     let dialog_sem = Arc::new(Semaphore::new(1)); // ダイアログは同時1件
 
-    // フェーズ1: 全ファイルを probe（probe 専用セマフォでネットワーク帯域を保護）
-    let probe_sem = Arc::new(Semaphore::new(io_parallel));
-    let mut probe_set: JoinSet<(PathBuf, Result<FileInfo, String>)> = JoinSet::new();
-    for path in file_paths {
-        let probe_sem = probe_sem.clone();
-        probe_set.spawn(async move {
-            let _permit = probe_sem.acquire().await.unwrap();
-            let result = probe_file(&path).await;
-            (path, result)
-        });
+    // フェーズ1+2+3-Stage1: ストリーミングパイプライン
+    // プローブ完了順にグループを解決し、揃い次第すぐに変換を開始する。
+    // ネットワーク時: I/Oシリアル読み込み→メモリ保持→stdin並列変換
+    // ローカル時: bytes=None で既存動作と同等
+
+    // プローブ前にステムグループを事前集計（重複判定カウントダウンに使用）
+    let mut group_remaining: std::collections::HashMap<(PathBuf, String), usize> =
+        std::collections::HashMap::new();
+    for path in &file_paths {
+        *group_remaining.entry(stem_key(path)).or_insert(0) += 1;
     }
+    let max_selected = group_remaining.len(); // progress_ratios Vec サイズの上限
 
-    let mut non_media: Vec<FR> = Vec::new();
-    let mut media_files: Vec<(PathBuf, FileInfo)> = Vec::new();
-    while let Some(Ok((path, result))) = probe_set.join_next().await {
-        match result {
-            Ok(info) => {
-                if info.has_media {
-                    media_files.push((path, info));
-                } else {
-                    non_media.push(FR::skipped(path.to_string_lossy()));
-                }
-            }
-            Err(e) => {
-                non_media.push(FR::error(path.to_string_lossy(), e));
-            }
-        }
-    }
-
-    // フェーズ2: 同階層・同ステム重複を除去し最良ソースを選択
-    let (selected, rejected_paths) = select_best_sources(media_files);
-    let rejected_results: Vec<FR> = rejected_paths
-        .iter()
-        .map(|p| FR::skipped(p.to_string_lossy()))
-        .collect();
-
-    // フェーズ3: 2段パイプライン変換
-    // ネットワーク時: Stage1(I/Oシリアル・メモリロード) → Stage2(CPU並列変換)
-    // ローカル時: bytes=None で直接パス渡し（既存動作と同等）
-    let selected_count = selected.len();
-    let progress_secs = Arc::new(tokio::sync::Mutex::new(vec![0.0f64; selected_count]));
-    let total_dur: f64 = selected
-        .iter()
-        .map(|(_, info)| info.duration_secs)
-        .sum::<f64>()
-        .max(1.0);
-    let total_duration = Arc::new(tokio::sync::Mutex::new(total_dur));
+    // プログレス追跡: 各スロットに 0.0–1.0 の完了比率を格納し、max_selected で割る。
+    // 分母が固定なので、Stage 1 が新ファイルを発見しても値が後退しない。
+    let progress_ratios = Arc::new(tokio::sync::Mutex::new(vec![0.0f64; max_selected]));
+    let total_selected = Arc::new(AtomicUsize::new(0));
 
     // メモリバジェット（ネットワーク時のみ有効）
     let memory_budget = settings.max_memory_mb * 1024 * 1024;
-    let memory_used = Arc::new(AtomicUsize::new(0));
+    memory_used.store(0, Ordering::Relaxed); // 今回の変換開始時にリセット
     let memory_freed = Arc::new(tokio::sync::Notify::new());
-    // silence trim が有効な場合はパスベース変換にフォールバック
-    // （detect_boundary_silence がファイルを再度読みに行くため二重読みになるのを避ける）
     let silence_trim_enabled = settings.silence_trim_enabled;
 
     // Stage 1 → Stage 2 チャンネル
     let (stage_tx, mut stage_rx) = tokio::sync::mpsc::channel::<(usize, PathBuf, FileInfo, Option<Vec<u8>>)>(cpu_parallel + 1);
 
-    // Stage 1: I/Oタスク（別タスクで非同期実行）
-    {
-        let memory_used = memory_used.clone();
-        let memory_freed = memory_freed.clone();
-        tokio::spawn(async move {
-            for (new_i, (path, info)) in selected.into_iter().enumerate() {
-                let should_buffer = is_network && !silence_trim_enabled;
-                let bytes = if should_buffer {
-                    let file_size = match tokio::fs::metadata(&path).await {
-                        Ok(m) => m.len() as usize,
-                        Err(_) => 0,
-                    };
-                    if file_size > 0 && file_size <= memory_budget {
-                        // メモリ空き待ち（常に最低1ファイルは処理進める）
-                        loop {
-                            let notified = memory_freed.notified();
-                            let used = memory_used.load(Ordering::Acquire);
-                            if used == 0 || used + file_size <= memory_budget { break; }
-                            notified.await;
-                        }
-                        memory_used.fetch_add(file_size, Ordering::Release);
-                        match tokio::fs::read(&path).await {
-                            Ok(b) => Some(b),
-                            Err(_) => {
-                                memory_used.fetch_sub(file_size, Ordering::Release);
-                                memory_freed.notify_one();
-                                None
-                            }
-                        }
-                    } else {
-                        None
+    // Stage 1: プローブ → グループ解決 → I/Oロード（バックグラウンドタスク）
+    // プローブ完了したグループから即座に Stage 2 へ送信する
+    let s1_memory_used = memory_used.clone();
+    let s1_memory_freed = memory_freed.clone();
+    let s1_total_selected = total_selected.clone();
+    let s1_app = app.clone();
+    let stage1_task = tokio::spawn(async move {
+        let probe_sem = Arc::new(Semaphore::new(io_parallel));
+        let mut probe_set: JoinSet<(PathBuf, Result<FileInfo, String>)> = JoinSet::new();
+        for path in file_paths {
+            let probe_sem = probe_sem.clone();
+            probe_set.spawn(async move {
+                let _permit = probe_sem.acquire().await.unwrap();
+                let result = probe_file(&path).await;
+                (path, result)
+            });
+        }
+
+        let mut group_media: std::collections::HashMap<(PathBuf, String), Vec<(PathBuf, FileInfo)>> =
+            std::collections::HashMap::new();
+        let mut non_media: Vec<FR> = Vec::new();
+        let mut rejected_results: Vec<FR> = Vec::new();
+        let mut stream_idx = 0usize;
+
+        while let Some(Ok((path, result))) = probe_set.join_next().await {
+            let key = stem_key(&path);
+            let remaining = group_remaining.get_mut(&key).unwrap();
+            *remaining -= 1;
+            let group_done = *remaining == 0;
+
+            match result {
+                Ok(info) if info.has_media => {
+                    group_media.entry(key.clone()).or_default().push((path, info));
+                }
+                Ok(_) => non_media.push(FR::skipped(path.to_string_lossy())),
+                Err(e) => non_media.push(FR::error(path.to_string_lossy(), e)),
+            }
+
+            if group_done {
+                if let Some(group) = group_media.remove(&key) {
+                    let (best, rejected_paths) = select_best_from_group(group);
+                    for p in rejected_paths {
+                        rejected_results.push(FR::skipped(p.to_string_lossy()));
                     }
-                } else {
-                    None
-                };
-                if stage_tx.send((new_i, path, info, bytes)).await.is_err() {
-                    break; // 受信側がドロップ（ジョブキャンセル）
+                    s1_total_selected.fetch_add(1, Ordering::Relaxed);
+
+                    // ネットワーク時かつ silence trim 無効ならメモリにロードして stdin 経由で渡す
+                    let should_buffer = is_network && !silence_trim_enabled;
+                    let bytes = if should_buffer {
+                        let file_size = tokio::fs::metadata(&best.0).await
+                            .map(|m| m.len() as usize).unwrap_or(0);
+                        if file_size > 0 && file_size <= memory_budget {
+                            loop {
+                                let notified = s1_memory_freed.notified();
+                                let used = s1_memory_used.load(Ordering::Acquire);
+                                if used == 0 || used + file_size <= memory_budget { break; }
+                                notified.await;
+                            }
+                            s1_memory_used.fetch_add(file_size, Ordering::Release);
+                            let new_used = s1_memory_used.load(Ordering::Relaxed);
+                            if let Some(st) = s1_app.try_state::<crate::AppState>() {
+                                st.memory_peak.fetch_max(new_used, Ordering::Relaxed);
+                            }
+                            match tokio::fs::read(&best.0).await {
+                                Ok(b) => Some(b),
+                                Err(_) => {
+                                    s1_memory_used.fetch_sub(file_size, Ordering::Release);
+                                    s1_memory_freed.notify_one();
+                                    None
+                                }
+                            }
+                        } else { None }
+                    } else { None };
+
+                    if stage_tx.send((stream_idx, best.0, best.1, bytes)).await.is_err() {
+                        break;
+                    }
+                    stream_idx += 1;
                 }
             }
-        });
-    }
+        }
+        (non_media, rejected_results)
+    });
 
     // Stage 2: CPUタスク（並列変換）
     let mut conv_set: JoinSet<FR> = JoinSet::new();
@@ -601,14 +634,14 @@ pub async fn run_conversion(
         let job_id = job_id.clone();
         let format = format.clone();
         let settings = settings.clone();
-        let progress_secs = progress_secs.clone();
-        let total_duration = total_duration.clone();
+        let progress_ratios = progress_ratios.clone();
         let file_duration = info.duration_secs;
         let pgids_for_spawn = pgids.clone();
         let base_dir = base_dir.clone();
         let dialog_sem = dialog_sem.clone();
         let memory_used = memory_used.clone();
         let memory_freed = memory_freed.clone();
+        let total_selected_for_watcher = total_selected.clone();
 
         conv_set.spawn(async move {
             let _permit = sem.acquire().await.unwrap();
@@ -636,30 +669,35 @@ pub async fn run_conversion(
             let (progress_tx, mut progress_rx) = watch::channel(0.0f64);
             let app_w = app.clone();
             let job_id_w = job_id.clone();
-            let ps_w = progress_secs.clone();
-            let td_w = total_duration.clone();
+            let pr_w = progress_ratios.clone();
             let name_w = input_display.clone();
             tokio::spawn(async move {
                 while progress_rx.changed().await.is_ok() {
                     let ratio = *progress_rx.borrow_and_update();
-                    let secs = ratio * file_duration;
                     let percent = {
-                        let mut ps = ps_w.lock().await;
-                        ps[new_i] = secs;
-                        let td = *td_w.lock().await;
-                        (ps.iter().sum::<f64>() / td * 100.0).min(100.0)
+                        let mut pr = pr_w.lock().await;
+                        if new_i < pr.len() { pr[new_i] = ratio; }
+                        // max_selected は事前確定した固定値なので分母が増加して後退しない
+                        (pr.iter().sum::<f64>() / max_selected.max(1) as f64 * 100.0).min(100.0)
                     };
+                    if let Some(st) = app_w.try_state::<crate::AppState>() {
+                        st.active_files.lock().unwrap().insert(name_w.clone(), ratio as f32);
+                    }
+                    let fc = total_selected_for_watcher.load(Ordering::Relaxed);
                     if app_w.emit("progress", ProgressPayload {
                         job_id: (*job_id_w).clone(),
                         percent,
                         current_file: name_w.clone(),
                         file_index: new_i,
-                        file_count: selected_count,
+                        file_count: fc,
                     }).is_err() {
                         eprintln!("emit progress failed");
                     }
                 }
             });
+
+            // 変換開始ログ（AppState バッファ経由でポーリングに渡す）
+            push_conv_log(&app, input_display.clone(), "processing", None);
 
             let result = convert_one(
                 &path,
@@ -689,8 +727,18 @@ pub async fn run_conversion(
             }
 
             {
-                let mut ps = progress_secs.lock().await;
-                ps[new_i] = file_duration;
+                let mut pr = progress_ratios.lock().await;
+                if new_i < pr.len() { pr[new_i] = 1.0; }
+            }
+
+            // 変換完了ログ
+            let (log_status, log_error) = match &result {
+                Ok(()) => ("done", None),
+                Err(e) => ("error", Some(e.to_string())),
+            };
+            push_conv_log(&app, input_display.clone(), log_status, log_error);
+            if let Some(st) = app.try_state::<crate::AppState>() {
+                st.active_files.lock().unwrap().remove(&input_display);
             }
 
             match result {
@@ -711,6 +759,9 @@ pub async fn run_conversion(
             }
         });
     }
+
+    // stage_tx が stage1_task 内で drop された後にここへ到達するので即座に完了する
+    let (non_media, rejected_results) = stage1_task.await.unwrap_or_default();
 
     let mut results: Vec<FR> = skip_results;
     results.extend(non_media);
@@ -743,14 +794,15 @@ pub async fn run_conversion(
     }
 
     // Emit final 100% progress before switching to standby
+    let final_count = total_selected.load(Ordering::Relaxed);
     if app.emit(
         "progress",
         ProgressPayload {
             job_id: (*job_id).clone(),
             percent: 100.0,
             current_file: String::new(),
-            file_index: selected_count,
-            file_count: selected_count,
+            file_index: final_count,
+            file_count: final_count,
         },
     ).is_err() {
         eprintln!("emit progress failed");
@@ -773,5 +825,57 @@ pub async fn run_conversion(
         },
     ).is_err() {
         eprintln!("emit conversion_complete failed");
+    }
+}
+
+#[cfg(test)]
+mod network_tests {
+    use super::*;
+
+    /// ローカルパスはネットワーク判定で false を返す
+    #[test]
+    fn local_temp_dir_is_not_network() {
+        let tmp = std::env::temp_dir();
+        // macOS/Linux 実装のみ呼び出し可能。Windows はビルド時に別関数
+        #[cfg(any(target_os = "macos", target_os = "linux"))]
+        assert!(!is_path_on_network(&tmp), "temp_dir should not be on network: {:?}", tmp);
+    }
+
+    #[test]
+    fn local_root_is_not_network() {
+        #[cfg(any(target_os = "macos", target_os = "linux"))]
+        assert!(!is_path_on_network(Path::new("/")));
+    }
+
+    /// has_network_input: 空のパスリストは false
+    #[test]
+    fn empty_paths_returns_false() {
+        assert!(!has_network_input(&[]));
+    }
+
+    /// has_network_input: ローカルの /tmp は false
+    #[test]
+    fn tmp_path_not_network() {
+        let tmp = std::env::temp_dir().to_string_lossy().into_owned();
+        assert!(!has_network_input(&[tmp]));
+    }
+
+    /// Windows のみ: UNC パスは必ずネットワーク判定
+    #[cfg(windows)]
+    #[test]
+    fn unc_path_is_network() {
+        assert!(has_network_input(&[r"\\server\share\file.flac".to_string()]));
+    }
+
+    /// Windows のみ: ローカルドライブパスはネットワーク判定されない
+    /// （実際のドライブ種別依存のため、存在するローカルドライブ C:\ を想定）
+    #[cfg(windows)]
+    #[test]
+    fn local_drive_path_not_network() {
+        // C:\ がローカルドライブの場合のみ成り立つ。CI では skip しても可
+        let path = r"C:\Users\test\music.flac".to_string();
+        // GetDriveTypeW が DRIVE_REMOTE を返さなければ false のはず
+        // ネットワークドライブにマップされていない前提のテスト
+        let _ = has_network_input(&[path]); // panics/crashes は起こらないことを確認
     }
 }

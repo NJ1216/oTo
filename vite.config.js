@@ -10,6 +10,7 @@ export default defineConfig({
         main: resolve(__dirname, 'index.html'),
         settings: resolve(__dirname, 'src/settings/settings.html'),
         about: resolve(__dirname, 'src/about/about.html'),
+        activity: resolve(__dirname, 'src/activity/activity.html'),
         preview: resolve(__dirname, 'src/silence-preview/preview.html'),
       },
     },

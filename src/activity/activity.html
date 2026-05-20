@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <script>try { document.documentElement.lang = localStorage.getItem('oto_lang') || 'ja'; } catch (_) {}</script>
+  <title data-i18n="activity.title">アクティビティ</title>
+  <link rel="stylesheet" href="/src/common.css" />
+  <link rel="stylesheet" href="/src/activity/activity.css" />
+</head>
+<body>
+  <div id="app">
+    <h1 class="section-title" data-i18n="activity.title">アクティビティ</h1>
+
+    <!-- メトリクス -->
+    <div id="metrics">
+      <div class="metric-card" id="cpu-card">
+        <div class="metric-label" data-i18n="activity.cpu">CPU 使用率</div>
+        <div class="metric-value" id="cpu-value">—</div>
+        <div class="metric-bar-track">
+          <div class="metric-bar" id="cpu-bar"></div>
+        </div>
+      </div>
+      <div class="metric-card" id="mem-card">
+        <div class="metric-label" data-i18n="activity.memory">メモリバッファ</div>
+        <div class="metric-value" id="mem-value">—</div>
+        <div class="metric-bar-track">
+          <div class="metric-bar" id="mem-bar"></div>
+        </div>
+        <div class="metric-hint" id="mem-hint"></div>
+        <div class="metric-peak" id="mem-peak"></div>
+      </div>
+    </div>
+
+    <!-- 変換ログ -->
+    <div class="log-header">
+      <span data-i18n="activity.log">変換ログ</span>
+      <button id="clear-btn" data-i18n="activity.clear">クリア</button>
+    </div>
+    <div id="log-list">
+      <div id="log-empty" class="log-empty" data-i18n="activity.logEmpty">変換が開始されると、ここにログが表示されます</div>
+    </div>
+  </div>
+
+  <script type="module" src="/src/activity/activity.js"></script>
+</body>
+</html>

@@ -36,77 +36,62 @@ pub fn common_ancestor(paths: &[PathBuf]) -> Option<PathBuf> {
     Some(ancestor)
 }
 
-// 同ディレクトリ内に拡張子違いの同名ファイルが存在する場合、最良ソースを1つ選ぶ。
-// 優先度: wav/aiff(PCM) > flac > その他のロスレス(ALAC 等) > 非可逆ファイルの最高ビットレート
-// 「.m4a」拡張子は AAC・ALAC 両方で使われるため、ロスレス判定は probe で得た
-// codec_name から導出される `info.is_lossless` を使用し、拡張子だけでは判定しない。
-pub fn select_best_sources(
-    files: Vec<(PathBuf, FileInfo)>,
-) -> (Vec<(PathBuf, FileInfo)>, Vec<PathBuf>) {
-    use std::collections::HashMap as Map;
-
-    let mut groups: Map<(PathBuf, String), Vec<(PathBuf, FileInfo)>> = Map::new();
-    for (path, info) in files {
-        let parent = path.parent().unwrap_or(std::path::Path::new("")).to_path_buf();
-        let stem = path
-            .file_stem()
-            .unwrap_or_default()
-            .to_string_lossy()
-            .to_lowercase();
-        groups.entry((parent, stem)).or_default().push((path, info));
-    }
-
-    let lossless_score = |path: &Path, info: &FileInfo| -> Option<u8> {
-        if !info.is_lossless {
-            return None;
-        }
-        let ext = path
-            .extension()
-            .map(|e| e.to_string_lossy().to_ascii_lowercase())
-            .unwrap_or_default();
-        Some(match ext.as_str() {
-            "wav" | "aiff" => 0,
-            "flac" => 1,
-            _ => 2, // alac (.m4a / .alac) など
-        })
-    };
-
-    let mut selected = Vec::new();
-    let mut rejected = Vec::new();
-
-    for (_, group) in groups {
-        if group.len() == 1 {
-            selected.push(group.into_iter().next().unwrap());
-            continue;
-        }
-
-        let best_idx = group
-            .iter()
-            .enumerate()
-            .filter_map(|(i, (path, info))| lossless_score(path, info).map(|s| (s, i)))
-            .min_by_key(|(s, _)| *s)
-            .map(|(_, i)| i)
-            .unwrap_or_else(|| {
-                // ロスレスなし → 最高ビットレートの非可逆ファイルを選ぶ
-                group
-                    .iter()
-                    .enumerate()
-                    .max_by_key(|(_, (_, info))| info.bit_rate_bps)
-                    .map(|(i, _)| i)
-                    .unwrap_or(0)
-            });
-
-        for (i, (path, info)) in group.into_iter().enumerate() {
-            if i == best_idx {
-                selected.push((path, info));
-            } else {
-                rejected.push(path);
-            }
-        }
-    }
-
-    (selected, rejected)
+/// (parent, lowercase_stem) キーを計算する（重複検出・ストリーミング処理で使用）
+pub fn stem_key(path: &Path) -> (PathBuf, String) {
+    let parent = path.parent().unwrap_or(Path::new("")).to_path_buf();
+    let stem = path.file_stem().unwrap_or_default().to_string_lossy().to_lowercase();
+    (parent, stem)
 }
+
+fn lossless_score(path: &Path, info: &FileInfo) -> Option<u8> {
+    if !info.is_lossless {
+        return None;
+    }
+    let ext = path
+        .extension()
+        .map(|e| e.to_string_lossy().to_ascii_lowercase())
+        .unwrap_or_default();
+    Some(match ext.as_str() {
+        "wav" | "aiff" => 0,
+        "flac" => 1,
+        _ => 2, // alac (.m4a / .alac) など
+    })
+}
+
+/// グループ内（同ディレクトリ・同ステム）から最良ファイルを1つ選ぶ
+/// 優先度: wav/aiff(PCM) > flac > その他のロスレス > 非可逆の最高ビットレート
+pub fn select_best_from_group(
+    group: Vec<(PathBuf, FileInfo)>,
+) -> ((PathBuf, FileInfo), Vec<PathBuf>) {
+    if group.len() == 1 {
+        return (group.into_iter().next().unwrap(), vec![]);
+    }
+    let best_idx = group
+        .iter()
+        .enumerate()
+        .filter_map(|(i, (path, info))| lossless_score(path, info).map(|s| (s, i)))
+        .min_by_key(|(s, _)| *s)
+        .map(|(_, i)| i)
+        .unwrap_or_else(|| {
+            group
+                .iter()
+                .enumerate()
+                .max_by_key(|(_, (_, info))| info.bit_rate_bps)
+                .map(|(i, _)| i)
+                .unwrap_or(0)
+        });
+    let mut best = None;
+    let mut rejected = Vec::new();
+    for (i, item) in group.into_iter().enumerate() {
+        if i == best_idx {
+            best = Some(item);
+        } else {
+            rejected.push(item.0);
+        }
+    }
+    (best.unwrap(), rejected)
+}
+
 
 #[cfg(test)]
 mod tests {
@@ -128,71 +113,75 @@ mod tests {
 
     #[test]
     fn single_file_is_always_selected() {
-        let files = vec![(PathBuf::from("/music/track.mp3"), make_info(false, 192_000))];
-        let (selected, rejected) = select_best_sources(files);
-        assert_eq!(selected.len(), 1);
+        let group = vec![(PathBuf::from("/music/track.mp3"), make_info(false, 192_000))];
+        let (best, rejected) = select_best_from_group(group);
+        assert_eq!(best.0.extension().unwrap(), "mp3");
         assert!(rejected.is_empty());
     }
 
     #[test]
     fn lossless_beats_lossy_same_stem() {
-        let files = vec![
+        let group = vec![
             (PathBuf::from("/music/track.mp3"), make_info(false, 320_000)),
             (PathBuf::from("/music/track.flac"), make_info(true, 1_000_000)),
         ];
-        let (selected, rejected) = select_best_sources(files);
-        assert_eq!(selected.len(), 1);
+        let (best, rejected) = select_best_from_group(group);
+        assert_eq!(best.0.extension().unwrap(), "flac");
         assert_eq!(rejected.len(), 1);
-        let ext = selected[0].0.extension().unwrap().to_str().unwrap();
-        assert_eq!(ext, "flac");
     }
 
     #[test]
     fn wav_beats_flac_among_lossless() {
-        let files = vec![
+        let group = vec![
             (PathBuf::from("/music/track.flac"), make_info(true, 900_000)),
             (PathBuf::from("/music/track.wav"), make_info(true, 1_400_000)),
         ];
-        let (selected, rejected) = select_best_sources(files);
-        assert_eq!(selected.len(), 1);
+        let (best, rejected) = select_best_from_group(group);
+        assert_eq!(best.0.extension().unwrap(), "wav");
         assert_eq!(rejected.len(), 1);
-        let ext = selected[0].0.extension().unwrap().to_str().unwrap();
-        assert_eq!(ext, "wav");
     }
 
     #[test]
     fn highest_bitrate_wins_among_all_lossy() {
-        let files = vec![
+        let group = vec![
             (PathBuf::from("/music/track.mp3"), make_info(false, 128_000)),
             (PathBuf::from("/music/track.aac"), make_info(false, 256_000)),
         ];
-        let (selected, rejected) = select_best_sources(files);
-        assert_eq!(selected.len(), 1);
+        let (best, rejected) = select_best_from_group(group);
+        assert_eq!(best.0.extension().unwrap(), "aac");
         assert_eq!(rejected.len(), 1);
-        let ext = selected[0].0.extension().unwrap().to_str().unwrap();
-        assert_eq!(ext, "aac");
     }
 
+    /// 異なるディレクトリの同名ファイルは stem_key が異なるグループになる
     #[test]
-    fn different_directories_are_not_grouped() {
-        let files = vec![
-            (PathBuf::from("/a/track.mp3"), make_info(false, 320_000)),
-            (PathBuf::from("/b/track.flac"), make_info(true, 1_000_000)),
-        ];
-        let (selected, rejected) = select_best_sources(files);
-        assert_eq!(selected.len(), 2);
-        assert!(rejected.is_empty());
+    fn different_directories_have_different_stem_keys() {
+        let key_a = stem_key(Path::new("/a/track.mp3"));
+        let key_b = stem_key(Path::new("/b/track.flac"));
+        assert_ne!(key_a, key_b);
     }
 
+    /// 異なるステム名のファイルは stem_key が異なるグループになる
     #[test]
-    fn different_stems_not_grouped() {
-        let files = vec![
-            (PathBuf::from("/music/song1.mp3"), make_info(false, 192_000)),
-            (PathBuf::from("/music/song2.mp3"), make_info(false, 192_000)),
-        ];
-        let (selected, rejected) = select_best_sources(files);
-        assert_eq!(selected.len(), 2);
-        assert!(rejected.is_empty());
+    fn different_stems_have_different_stem_keys() {
+        let key1 = stem_key(Path::new("/music/song1.mp3"));
+        let key2 = stem_key(Path::new("/music/song2.mp3"));
+        assert_ne!(key1, key2);
+    }
+
+    /// stem_key は拡張子を無視して同ステムを同一グループとみなす
+    #[test]
+    fn same_stem_different_ext_same_key() {
+        let key_mp3 = stem_key(Path::new("/music/track.mp3"));
+        let key_flac = stem_key(Path::new("/music/track.flac"));
+        assert_eq!(key_mp3, key_flac);
+    }
+
+    /// stem_key は大文字小文字を区別しない
+    #[test]
+    fn stem_key_is_case_insensitive() {
+        let key_lower = stem_key(Path::new("/music/Track.mp3"));
+        let key_upper = stem_key(Path::new("/music/TRACK.flac"));
+        assert_eq!(key_lower, key_upper);
     }
 
     #[test]

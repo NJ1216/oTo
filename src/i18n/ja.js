@@ -6,6 +6,7 @@ export default {
    },
   menu: {
     settings: '設定',
+    activity: 'アクティビティ',
     about: 'バージョン情報',
   },
   toast: {
@@ -160,6 +161,20 @@ export default {
     prePlaySeconds: 'プリロール',
     cancel: 'キャンセル',
     apply: '適用',
+  },
+  activity: {
+    title: 'アクティビティ',
+    cpu: 'CPU 使用率',
+    memory: 'メモリバッファ',
+    memoryInactive: '変換待機中',
+    memoryLocal: 'ローカルフォルダ（バッファ不使用）',
+    log: '変換ログ',
+    clear: 'クリア',
+    logEmpty: '変換が開始されると、ここにログが表示されます',
+    statusProcessing: '変換中',
+    statusDone: '完了',
+    statusError: 'エラー',
+    statusSkipped: 'スキップ',
   },
   about: {
     subtitle: '音声変換ツール',

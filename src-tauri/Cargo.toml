@@ -28,6 +28,7 @@ anyhow = "1.0"
 dirs = "6.0"
 base64 = "0.22"
 uuid = { version = "1.23", features = ["v4"] }
+sysinfo = { version = "0.32", default-features = false, features = ["system"] }
 
 [target.'cfg(unix)'.dependencies]
 libc = "0.2"

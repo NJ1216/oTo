@@ -6,6 +6,7 @@ export default {
    },
   menu: {
     settings: 'Settings',
+    activity: 'Activity',
     about: 'About',
   },
   toast: {
@@ -160,6 +161,20 @@ export default {
     prePlaySeconds: 'Pre-roll',
     cancel: 'Cancel',
     apply: 'Apply',
+  },
+  activity: {
+    title: 'Activity',
+    cpu: 'CPU Usage',
+    memory: 'Memory Buffer',
+    memoryInactive: 'Waiting for conversion',
+    memoryLocal: 'Local folder (no buffer)',
+    log: 'Conversion Log',
+    clear: 'Clear',
+    logEmpty: 'Conversion log will appear here',
+    statusProcessing: 'Converting',
+    statusDone: 'Done',
+    statusError: 'Error',
+    statusSkipped: 'Skipped',
   },
   about: {
     subtitle: 'Audio Converter',

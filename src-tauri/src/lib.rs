@@ -1,9 +1,18 @@
 use serde::Serialize;
-use std::collections::HashMap;
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::collections::{HashMap, VecDeque};
+use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::Arc;
 use tauri::{AppHandle, Emitter, Manager, State, WebviewUrl};
 use tokio::sync::Mutex;
+
+/// 変換ログの1エントリ（AppState に蓄積してポーリングで取得）
+#[derive(Serialize, Clone)]
+pub struct ConvLogEntry {
+    pub ts_ms: u64,
+    pub file_name: String,
+    pub status: String, // "processing" | "done" | "error" | "skipped"
+    pub error: Option<String>,
+}
 
 mod converter;
 mod settings;
@@ -23,6 +32,32 @@ pub struct AppState {
     pub jobs: Mutex<HashMap<String, JobInfo>>,
     pub is_converting: AtomicBool,
     pub overwrite_tx: std::sync::Mutex<Option<tokio::sync::oneshot::Sender<OverwriteChoice>>>,
+    /// ネットワーク変換用メモリバッファ現在使用量（バイト）
+    pub memory_used: Arc<AtomicUsize>,
+    /// ネットワーク変換用メモリバッファ今回変換中のピーク使用量（バイト）
+    pub memory_peak: AtomicUsize,
+    /// ネットワーク変換用メモリバジェット（MB）—変換開始時に設定値から更新
+    pub memory_budget_mb: AtomicUsize,
+    /// sysinfo による CPU 監視インスタンス（ポーリングごとに refresh）
+    pub sys_monitor: std::sync::Mutex<sysinfo::System>,
+    /// 変換ログバッファ（最新300件、循環）
+    pub conv_log: std::sync::Mutex<VecDeque<ConvLogEntry>>,
+    /// 現在の変換がネットワークフォルダ対象かどうか
+    pub is_network_conv: AtomicBool,
+    /// 変換中のファイルと進捗比率（0.0–1.0）
+    pub active_files: std::sync::Mutex<HashMap<String, f32>>,
+}
+
+#[derive(Serialize)]
+struct ActivityData {
+    cpu_percent: f64,
+    memory_used_mb: usize,
+    memory_peak_mb: usize,
+    memory_budget_mb: usize,
+    is_network: bool,
+    is_converting: bool,
+    log: Vec<ConvLogEntry>,
+    active_files: HashMap<String, f32>,
 }
 
 // --- Commands ---
@@ -38,6 +73,12 @@ async fn convert_files(
     let pgids: Arc<std::sync::Mutex<Vec<i32>>> = Arc::new(std::sync::Mutex::new(vec![]));
 
     state.is_converting.store(true, Ordering::SeqCst);
+    // メモリバジェットを今回の設定値で更新
+    state.memory_budget_mb.store(current_settings.max_memory_mb, Ordering::Relaxed);
+    state.memory_peak.store(0, Ordering::Relaxed);
+    state.active_files.lock().unwrap().clear();
+    let memory_used = state.memory_used.clone();
+
     let job_id_clone = job_id.clone();
     let app_clone = app.clone();
     let app_for_cleanup = app.clone();
@@ -45,7 +86,7 @@ async fn convert_files(
     let pgids_for_conv = pgids.clone();
 
     let handle = tokio::spawn(async move {
-        run_conversion(app_clone, job_id_clone, request, current_settings, pgids_for_conv).await;
+        run_conversion(app_clone, job_id_clone, request, current_settings, pgids_for_conv, memory_used).await;
         // 完了通知は run_conversion 内で先に emit 済み。後始末は順次行う。
         // is_converting は run_conversion 終了直後 (emit 直前) に解除済みなので
         // ここでは jobs マップからの除去のみで十分。
@@ -480,14 +521,50 @@ fn open_url(url: String) -> Result<(), String> {
     Ok(())
 }
 
+// --- Activity Monitor commands ---
+
+#[tauri::command]
+async fn open_activity_window(app: AppHandle) -> Result<(), String> {
+    ensure_window(&app, "activity", dev_url("activity/activity.html"), "oTo - Activity", 480.0, 540.0, true).await
+}
+
+#[tauri::command]
+fn get_activity_data(state: State<'_, AppState>) -> ActivityData {
+    let pid = sysinfo::Pid::from_u32(std::process::id());
+    let cpu_percent = {
+        let mut sys = state.sys_monitor.lock().unwrap();
+        sys.refresh_processes(sysinfo::ProcessesToUpdate::Some(&[pid]), false);
+        sys.process(pid).map(|p: &sysinfo::Process| p.cpu_usage() as f64).unwrap_or(0.0)
+    };
+    let memory_used_mb = state.memory_used.load(Ordering::Relaxed) / (1024 * 1024);
+    let memory_peak_mb = state.memory_peak.load(Ordering::Relaxed) / (1024 * 1024);
+    let memory_budget_mb = state.memory_budget_mb.load(Ordering::Relaxed);
+    let is_network = state.is_network_conv.load(Ordering::Relaxed);
+    let is_converting = state.is_converting.load(Ordering::SeqCst);
+    let log: Vec<ConvLogEntry> = state.conv_log.lock().unwrap().iter().cloned().collect();
+    let active_files: HashMap<String, f32> = state.active_files.lock().unwrap().clone();
+    ActivityData { cpu_percent, memory_used_mb, memory_peak_mb, memory_budget_mb, is_network, is_converting, log, active_files }
+}
+
 // --- App entry ---
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    let mut sys = sysinfo::System::new();
+    let init_pid = sysinfo::Pid::from_u32(std::process::id());
+    sys.refresh_processes(sysinfo::ProcessesToUpdate::Some(&[init_pid]), false);
+
     let state = AppState {
         jobs: Mutex::new(HashMap::new()),
         is_converting: AtomicBool::new(false),
         overwrite_tx: std::sync::Mutex::new(None),
+        memory_used: Arc::new(AtomicUsize::new(0)),
+        memory_peak: AtomicUsize::new(0),
+        memory_budget_mb: AtomicUsize::new(0),
+        sys_monitor: std::sync::Mutex::new(sys),
+        conv_log: std::sync::Mutex::new(VecDeque::new()),
+        is_network_conv: AtomicBool::new(false),
+        active_files: std::sync::Mutex::new(HashMap::new()),
     };
 
     tauri::Builder::default()
@@ -502,6 +579,8 @@ pub fn run() {
             save_settings,
             open_settings_window,
             open_about_window,
+            open_activity_window,
+            get_activity_data,
             pick_folder,
             get_app_version,
             open_url,

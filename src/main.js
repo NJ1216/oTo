@@ -394,6 +394,11 @@ function registerContextMenu() {
     invoke('open_settings_window').catch(console.error);
   });
 
+  document.getElementById('menu-activity').addEventListener('click', () => {
+    hideContextMenu();
+    invoke('open_activity_window').catch(console.error);
+  });
+
   document.getElementById('menu-about').addEventListener('click', () => {
     hideContextMenu();
     invoke('open_about_window').catch(console.error);
