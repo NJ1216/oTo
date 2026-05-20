@@ -1,5 +1,7 @@
 use std::path::Path;
 use super::binary::ffmpeg_path;
+#[cfg(windows)]
+use std::os::windows::process::CommandExt;
 
 /// Parse FFmpeg silence detection output and return all silence regions.
 /// 末尾無音 (silence_end が無い未クローズの silence_start) は
@@ -42,7 +44,7 @@ fn run_silence_detect_raw(path: &Path, db: f64, min_dur_secs: f64) -> (Vec<(f64,
        .args(["-af", &filter, "-f", "null", "-"])
        .stderr(std::process::Stdio::piped());
     #[cfg(windows)]
-    { use std::os::windows::process::CommandExt; cmd.creation_flags(0x08000000); }
+    { cmd.creation_flags(0x08000000); }
 
     let out = match cmd.output() {
         Ok(o) => o,
