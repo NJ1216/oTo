@@ -122,6 +122,7 @@ mod tests {
             has_media: true,
             is_lossless,
             bit_rate_bps,
+            format_name: String::new(),
         }
     }
 

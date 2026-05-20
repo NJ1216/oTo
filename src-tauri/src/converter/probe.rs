@@ -30,6 +30,7 @@ pub async fn probe_file(path: &Path) -> Result<FileInfo, String> {
     let mut has_media = false;
     let mut is_lossless = false;
     let mut bit_rate_bps = 0u64;
+    let mut format_name = String::new();
 
     if let Some(out) = output {
         if let Ok(json) = serde_json::from_slice::<serde_json::Value>(&out.stdout) {
@@ -40,6 +41,9 @@ pub async fn probe_file(path: &Path) -> Result<FileInfo, String> {
                 .and_then(|s| s.parse::<u64>().ok())
             {
                 bit_rate_bps = br;
+            }
+            if let Some(fn_str) = json["format"]["format_name"].as_str() {
+                format_name = fn_str.split(',').next().unwrap_or("").to_string();
             }
             if let Some(tag_obj) = json["format"]["tags"].as_object() {
                 for (k, v) in tag_obj {
@@ -100,5 +104,6 @@ pub async fn probe_file(path: &Path) -> Result<FileInfo, String> {
         has_media,
         is_lossless,
         bit_rate_bps,
+        format_name,
     })
 }

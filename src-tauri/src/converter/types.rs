@@ -68,6 +68,7 @@ pub struct FileInfo {
     pub has_media: bool,
     pub is_lossless: bool,
     pub bit_rate_bps: u64,
+    pub format_name: String,
 }
 
 #[derive(Debug)]

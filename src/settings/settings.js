@@ -83,6 +83,7 @@ function populateForm(s) {
 
   document.getElementById('openInFinder').checked = s.openInFinder;
   document.getElementById('language').value = s.language || '';
+  document.getElementById('maxMemoryMb').value = String(s.maxMemoryMb ?? 512);
 }
 
 function toggleCbrVbr(fmt, mode) {
@@ -195,6 +196,7 @@ function collectFormValues() {
     preserveFolderStructure: chk('preserveFolderStructure'),
     customOutputPath: customPath,
     language: str('language'),
+    maxMemoryMb: int('maxMemoryMb', 512),
     enabledFormats: (() => {
       const checked = [...document.querySelectorAll('#encode-fmt-group .fmt-toggle-btn.active')].map((b) => b.dataset.fmt);
       return checked.length > 0 ? checked : ['mp3'];

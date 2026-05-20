@@ -103,6 +103,11 @@ export default {
       title: 'Other',
       reveal: 'Open output folder after conversion',
     },
+    network: {
+      title: 'Network',
+      maxMemory: 'Memory buffer limit',
+      maxMemoryHint: 'Maximum memory used when converting from network folders. Memory is freed progressively as conversions complete.',
+    },
     lang: {
       title: 'Language',
       auto: 'Follow system setting',

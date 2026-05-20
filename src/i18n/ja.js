@@ -103,6 +103,11 @@ export default {
       title: 'その他',
       reveal: '変換完了後に出力先を開く',
     },
+    network: {
+      title: 'ネットワーク',
+      maxMemory: 'メモリバッファ上限',
+      maxMemoryHint: 'ネットワークフォルダからの変換時に使用するメモリ上限。変換済みデータから順次解放されます。',
+    },
     lang: {
       title: '言語',
       auto: 'システム設定に従う',

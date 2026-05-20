@@ -58,6 +58,7 @@ fn default_last_mode() -> String    { "encode".into() }
 fn default_last_format() -> String  { "mp3".into() }
 fn default_silence_trim_db() -> f64 { -80.0 }
 fn default_silence_trim_duration_ms() -> u32 { 50 }
+fn default_max_memory_mb() -> usize { 512 }
 
 fn calc_parallel_count() -> usize {
     let cpu_count = std::thread::available_parallelism()
@@ -150,6 +151,9 @@ pub struct Settings {
     pub silence_trim_db: f64,
     #[serde(default = "default_silence_trim_duration_ms")]
     pub silence_trim_duration_ms: u32,
+
+    #[serde(default = "default_max_memory_mb")]
+    pub max_memory_mb: usize,
 }
 
 impl Default for Settings {
@@ -191,6 +195,7 @@ impl Default for Settings {
             silence_trim_enabled: false,
             silence_trim_db: default_silence_trim_db(),
             silence_trim_duration_ms: default_silence_trim_duration_ms(),
+            max_memory_mb: default_max_memory_mb(),
         }
     }
 }
@@ -273,6 +278,8 @@ impl Settings {
         // Silence trim
         self.silence_trim_db = self.silence_trim_db.clamp(-100.0, 0.0);
         self.silence_trim_duration_ms = self.silence_trim_duration_ms.clamp(1, 10000);
+
+        self.max_memory_mb = self.max_memory_mb.clamp(128, 8192);
 
         // Enabled formats: ensure at least one
         if self.enabled_formats.is_empty() {

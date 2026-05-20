@@ -28,8 +28,10 @@ use probe::probe_file;
 use silence::detect_boundary_silence;
 use types::{FileInfo, FileResult as FR};
 
+use std::sync::atomic::{AtomicUsize, Ordering};
 #[cfg(windows)]
-use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::atomic::AtomicU64;
+use tokio::io::AsyncWriteExt;
 
 #[cfg(windows)]
 static PROGRESS_FILE_COUNTER: AtomicU64 = AtomicU64::new(0);
@@ -47,6 +49,7 @@ async fn convert_one(
     info: &FileInfo,
     duration_secs: f64,
     threads_per_job: usize,
+    input_bytes: Option<Vec<u8>>,
     on_progress: impl Fn(f64) + Send,
     on_pid: impl Fn(u32) + Send,
 ) -> Result<()> {
@@ -191,21 +194,25 @@ async fn convert_one(
     args.push("-nostats".into());
 
     // args[..3] = [-threads, N, -y]; args[3..] = [-map_metadata … -nostats]
-    // Input/output are passed as OsStr via .arg() to handle non-UTF-8 filenames.
+    // input_bytes が Some のとき: -f <format_name> -i pipe:0 でstdin経由
+    // input_bytes が None のとき: 既存のOsStr方式でファイルパス直接渡し
     let mut cmd = tokio::process::Command::new(&ffmpeg);
-    cmd.args(&args[..3])
-       .arg("-i")
-       .arg(input)
-       .args(&args[3..])
-       .arg(output);
+    cmd.args(&args[..3]);
+    if input_bytes.is_some() {
+        cmd.args(["-f", &info.format_name, "-i", "pipe:0"]);
+    } else {
+        cmd.arg("-i").arg(input);
+    }
+    cmd.args(&args[3..]).arg(output);
     #[cfg(not(windows))]
     {
-        cmd.stdout(Stdio::piped())
+        cmd.stdin(Stdio::piped())
+           .stdout(Stdio::piped())
            .stderr(Stdio::piped());
     }
     #[cfg(windows)]
     {
-        cmd.stdin(Stdio::null())
+        cmd.stdin(Stdio::piped())
            .stdout(Stdio::null())   // プログレスは一時ファイルへ。stdout は不使用
            .stderr(Stdio::piped())
            .creation_flags(0x08000000); // CREATE_NO_WINDOW
@@ -227,6 +234,19 @@ async fn convert_one(
 
     if let Some(pid) = child.id() {
         on_pid(pid);
+    }
+
+    // input_bytes が Some のとき: stdin にバイト列を書き込んで閉じる
+    // drop で EOF が通知されFFmpegが入力終端を認識する
+    if let Some(bytes) = input_bytes {
+        if let Some(mut stdin_handle) = child.stdin.take() {
+            tokio::spawn(async move {
+                let _ = stdin_handle.write_all(&bytes).await;
+            });
+        }
+    } else {
+        // stdin を使わない場合は閉じる（Windowsでパイプがハングしないよう）
+        drop(child.stdin.take());
     }
 
     let stderr_task = child.stderr.take().map(|stderr| {
@@ -358,8 +378,39 @@ fn has_network_input(paths: &[String]) -> bool {
     false
 }
 
+#[cfg(target_os = "macos")]
+fn is_path_on_network(path: &Path) -> bool {
+    use std::ffi::CString;
+    if let Ok(cpath) = CString::new(path.as_os_str().as_encoded_bytes()) {
+        let mut stat: libc::statfs = unsafe { std::mem::zeroed() };
+        if unsafe { libc::statfs(cpath.as_ptr(), &mut stat) } == 0 {
+            return (stat.f_flags as u32 & libc::MNT_LOCAL as u32) == 0;
+        }
+    }
+    false
+}
+
+#[cfg(target_os = "linux")]
+fn is_path_on_network(path: &Path) -> bool {
+    use std::ffi::CString;
+    // NFS=0x6969, CIFS/SMB=0xFF534D42, SMB2=0xFE534D42, SMBFS=0x517B
+    if let Ok(cpath) = CString::new(path.as_os_str().as_encoded_bytes()) {
+        let mut stat: libc::statfs = unsafe { std::mem::zeroed() };
+        if unsafe { libc::statfs(cpath.as_ptr(), &mut stat) } == 0 {
+            let f_type = stat.f_type as u64;
+            return matches!(f_type, 0x6969 | 0xFF534D42 | 0xFE534D42 | 0x517B);
+        }
+    }
+    false
+}
+
+#[cfg(not(any(target_os = "macos", target_os = "linux", windows)))]
+fn is_path_on_network(_path: &Path) -> bool { false }
+
 #[cfg(not(windows))]
-fn has_network_input(_paths: &[String]) -> bool { false }
+fn has_network_input(paths: &[String]) -> bool {
+    paths.iter().any(|p| is_path_on_network(Path::new(p)))
+}
 
 // --- Main conversion runner ---
 
@@ -429,16 +480,20 @@ pub async fn run_conversion(
 
     let settings = Arc::new(settings);
     let job_id = Arc::new(job_id);
-    // ネットワーク入力を検出した場合は並列数を1に制限して帯域飽和を防止
-    let effective_parallel = if has_network_input(&request.paths) { 1 } else { settings.parallel_count.max(1) };
+    // ネットワーク入力を検出（macOS/Linux/Windowsでマウント種別を判定）
+    let is_network = has_network_input(&request.paths);
+    // CPU並列数: 常にユーザー設定値を使用（ネットワーク時も変換は並列）
+    let cpu_parallel = settings.parallel_count.max(1);
+    // I/O並列数: ネットワーク時はシリアル（帯域飽和防止）、ローカルは並列
+    let io_parallel = if is_network { 1 } else { cpu_parallel };
     // 並列数に応じてCPUスレッドを均等配分（1ジョブあたりのスレッド数）
     let cpu_count = std::thread::available_parallelism().map(|n| n.get()).unwrap_or(4);
-    let threads_per_job = (cpu_count / effective_parallel).max(1);
-    let sem = Arc::new(Semaphore::new(effective_parallel));
+    let threads_per_job = (cpu_count / cpu_parallel).max(1);
+    let sem = Arc::new(Semaphore::new(cpu_parallel));
     let dialog_sem = Arc::new(Semaphore::new(1)); // ダイアログは同時1件
 
     // フェーズ1: 全ファイルを probe（probe 専用セマフォでネットワーク帯域を保護）
-    let probe_sem = Arc::new(Semaphore::new(effective_parallel));
+    let probe_sem = Arc::new(Semaphore::new(io_parallel));
     let mut probe_set: JoinSet<(PathBuf, Result<FileInfo, String>)> = JoinSet::new();
     for path in file_paths {
         let probe_sem = probe_sem.clone();
@@ -473,7 +528,9 @@ pub async fn run_conversion(
         .map(|p| FR::skipped(p.to_string_lossy()))
         .collect();
 
-    // フェーズ3: 選択ファイルを並列変換
+    // フェーズ3: 2段パイプライン変換
+    // ネットワーク時: Stage1(I/Oシリアル・メモリロード) → Stage2(CPU並列変換)
+    // ローカル時: bytes=None で直接パス渡し（既存動作と同等）
     let selected_count = selected.len();
     let progress_secs = Arc::new(tokio::sync::Mutex::new(vec![0.0f64; selected_count]));
     let total_dur: f64 = selected
@@ -483,8 +540,62 @@ pub async fn run_conversion(
         .max(1.0);
     let total_duration = Arc::new(tokio::sync::Mutex::new(total_dur));
 
+    // メモリバジェット（ネットワーク時のみ有効）
+    let memory_budget = settings.max_memory_mb * 1024 * 1024;
+    let memory_used = Arc::new(AtomicUsize::new(0));
+    let memory_freed = Arc::new(tokio::sync::Notify::new());
+    // silence trim が有効な場合はパスベース変換にフォールバック
+    // （detect_boundary_silence がファイルを再度読みに行くため二重読みになるのを避ける）
+    let silence_trim_enabled = settings.silence_trim_enabled;
+
+    // Stage 1 → Stage 2 チャンネル
+    let (stage_tx, mut stage_rx) = tokio::sync::mpsc::channel::<(usize, PathBuf, FileInfo, Option<Vec<u8>>)>(cpu_parallel + 1);
+
+    // Stage 1: I/Oタスク（別タスクで非同期実行）
+    {
+        let memory_used = memory_used.clone();
+        let memory_freed = memory_freed.clone();
+        tokio::spawn(async move {
+            for (new_i, (path, info)) in selected.into_iter().enumerate() {
+                let should_buffer = is_network && !silence_trim_enabled;
+                let bytes = if should_buffer {
+                    let file_size = match tokio::fs::metadata(&path).await {
+                        Ok(m) => m.len() as usize,
+                        Err(_) => 0,
+                    };
+                    if file_size > 0 && file_size <= memory_budget {
+                        // メモリ空き待ち（常に最低1ファイルは処理進める）
+                        loop {
+                            let notified = memory_freed.notified();
+                            let used = memory_used.load(Ordering::Acquire);
+                            if used == 0 || used + file_size <= memory_budget { break; }
+                            notified.await;
+                        }
+                        memory_used.fetch_add(file_size, Ordering::Release);
+                        match tokio::fs::read(&path).await {
+                            Ok(b) => Some(b),
+                            Err(_) => {
+                                memory_used.fetch_sub(file_size, Ordering::Release);
+                                memory_freed.notify_one();
+                                None
+                            }
+                        }
+                    } else {
+                        None
+                    }
+                } else {
+                    None
+                };
+                if stage_tx.send((new_i, path, info, bytes)).await.is_err() {
+                    break; // 受信側がドロップ（ジョブキャンセル）
+                }
+            }
+        });
+    }
+
+    // Stage 2: CPUタスク（並列変換）
     let mut conv_set: JoinSet<FR> = JoinSet::new();
-    for (new_i, (path, info)) in selected.into_iter().enumerate() {
+    while let Some((new_i, path, info, input_bytes)) = stage_rx.recv().await {
         let sem = sem.clone();
         let app = app.clone();
         let job_id = job_id.clone();
@@ -496,15 +607,24 @@ pub async fn run_conversion(
         let pgids_for_spawn = pgids.clone();
         let base_dir = base_dir.clone();
         let dialog_sem = dialog_sem.clone();
+        let memory_used = memory_used.clone();
+        let memory_freed = memory_freed.clone();
 
         conv_set.spawn(async move {
             let _permit = sem.acquire().await.unwrap();
+            let byte_size = input_bytes.as_ref().map(|b| b.len()).unwrap_or(0);
 
             let output_path = match resolve_output_path(
                 &path, &format, &settings, base_dir.as_deref(), &app, &dialog_sem,
             ).await {
                 Ok(p) => p,
-                Err(e) => return FR::error(path.to_string_lossy(), e.to_string()),
+                Err(e) => {
+                    if byte_size > 0 {
+                        memory_used.fetch_sub(byte_size, Ordering::Release);
+                        memory_freed.notify_one();
+                    }
+                    return FR::error(path.to_string_lossy(), e.to_string());
+                }
             };
 
             let input_display = path
@@ -549,6 +669,7 @@ pub async fn run_conversion(
                 &info,
                 file_duration,
                 threads_per_job,
+                input_bytes,
                 move |ratio| { let _ = progress_tx.send(ratio); },
                 {
                     // cancel_job が pid 登録より先に走ると ffmpeg を kill できなくなる。
@@ -560,6 +681,12 @@ pub async fn run_conversion(
                 },
             )
             .await;
+
+            // 変換完了後にメモリを解放しStage1に通知
+            if byte_size > 0 {
+                memory_used.fetch_sub(byte_size, Ordering::Release);
+                memory_freed.notify_one();
+            }
 
             {
                 let mut ps = progress_secs.lock().await;
