@@ -105,6 +105,10 @@ async fn cancel_job(
     let mut jobs = state.jobs.lock().await;
     if let Some(job) = jobs.remove(&job_id) {
         job.handle.abort();
+        // キャンセル時にログと状態をリセット
+        state.conv_log.lock().unwrap().clear();
+        state.active_files.lock().unwrap().clear();
+        state.is_converting.store(false, Ordering::SeqCst);
         #[cfg(unix)]
         {
             let pgids = job.pgids.lock().unwrap();
