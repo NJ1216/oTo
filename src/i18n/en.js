@@ -103,6 +103,7 @@ export default {
     misc: {
       title: 'Other',
       reveal: 'Open output folder after conversion',
+      clearLogOnConvert: 'Clear logs on conversion',
     },
     network: {
       title: 'Network',

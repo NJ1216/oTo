@@ -103,6 +103,7 @@ export default {
     misc: {
       title: 'その他',
       reveal: '変換完了後に出力先を開く',
+      clearLogOnConvert: '変換時にログをクリアする',
     },
     network: {
       title: 'ネットワーク',

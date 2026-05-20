@@ -9,20 +9,40 @@ let windowOpenTs = Date.now();
 const logEntryMap = new Map();
 // 適用済みログエントリ数（visible 配列内の index）
 let appliedLogCount = 0;
+// 設定
+let settings = null;
+// 前回の is_converting フラグ
+let prevIsConverting = false;
 
 // --- Init ---
 async function init() {
   await initI18n();
   applyI18n();
-  startPolling();
 
-  document.getElementById('clear-btn').addEventListener('click', () => {
+  // 設定を読み込む
+  try {
+    settings = await invoke('load_settings');
+  } catch (_) {
+    settings = { clearLogOnConvert: true };
+  }
+
+  // クリアボタンの表示制御
+  const clearBtn = document.getElementById('clear-btn');
+  if (settings.clearLogOnConvert) {
+    clearBtn.style.display = 'none';
+  } else {
+    clearBtn.style.display = '';
+  }
+
+  clearBtn.addEventListener('click', () => {
     document.getElementById('log-list').innerHTML =
       `<div id="log-empty" class="log-empty">${t('activity.logEmpty')}</div>`;
     windowOpenTs = Date.now();
     appliedLogCount = 0;
     logEntryMap.clear();
   });
+
+  startPolling();
 }
 
 function applyI18n() {
@@ -37,12 +57,24 @@ function applyI18n() {
 // --- Polling ---
 function startPolling() {
   poll();
-  pollTimer = setInterval(poll, 600);
+  pollTimer = setInterval(poll, 200);
 }
 
 async function poll() {
   try {
     const data = await invoke('get_activity_data');
+
+    // is_converting フラグの遷移を検知して自動クリア
+    const isConverting = data.is_converting ?? false;
+    if (!prevIsConverting && isConverting && settings?.clearLogOnConvert) {
+      document.getElementById('log-list').innerHTML =
+        `<div id="log-empty" class="log-empty">${t('activity.logEmpty')}</div>`;
+      windowOpenTs = Date.now();
+      appliedLogCount = 0;
+      logEntryMap.clear();
+    }
+    prevIsConverting = isConverting;
+
     updateMetrics(data);
     updateLog(data.log ?? [], data.active_files ?? {});
   } catch (_) {}
@@ -83,12 +115,12 @@ function updateMetrics({ cpu_percent, memory_used_mb, memory_peak_mb, memory_bud
     memPeak.textContent = '';
   } else {
     const pct = Math.min(used / budget * 100, 100);
-    memEl.textContent = used + ' MB';
+    memEl.textContent = used.toFixed(1) + ' MB';
     memBar.style.width = pct.toFixed(1) + '%';
     memBar.className = 'metric-bar' +
       (pct >= 90 ? ' danger' : pct >= 70 ? ' warn' : '');
     memHint.textContent = `/ ${budget} MB`;
-    memPeak.textContent = peak > 0 ? `peak: ${peak} MB` : '';
+    memPeak.textContent = peak > 0 ? `peak: ${peak.toFixed(1)} MB` : '';
   }
 }
 

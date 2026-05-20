@@ -59,6 +59,7 @@ fn default_last_format() -> String  { "mp3".into() }
 fn default_silence_trim_db() -> f64 { -80.0 }
 fn default_silence_trim_duration_ms() -> u32 { 50 }
 fn default_max_memory_mb() -> usize { 512 }
+fn default_clear_log_on_convert() -> bool { true }
 
 fn calc_parallel_count() -> usize {
     let cpu_count = std::thread::available_parallelism()
@@ -154,6 +155,8 @@ pub struct Settings {
 
     #[serde(default = "default_max_memory_mb")]
     pub max_memory_mb: usize,
+    #[serde(default = "default_clear_log_on_convert")]
+    pub clear_log_on_convert: bool,
 }
 
 impl Default for Settings {
@@ -196,6 +199,7 @@ impl Default for Settings {
             silence_trim_db: default_silence_trim_db(),
             silence_trim_duration_ms: default_silence_trim_duration_ms(),
             max_memory_mb: default_max_memory_mb(),
+            clear_log_on_convert: default_clear_log_on_convert(),
         }
     }
 }

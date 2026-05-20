@@ -82,6 +82,7 @@ function populateForm(s) {
   });
 
   document.getElementById('openInFinder').checked = s.openInFinder;
+  document.getElementById('clearLogOnConvert').checked = s.clearLogOnConvert ?? true;
   document.getElementById('language').value = s.language || '';
   document.getElementById('maxMemoryMb').value = String(s.maxMemoryMb ?? 512);
 }
@@ -193,6 +194,7 @@ function collectFormValues() {
     alacBitDepth: int('alacBitDepth', 16),
     silenceTrimEnabled: chk('silenceTrimEnabled'),
     openInFinder: chk('openInFinder'),
+    clearLogOnConvert: chk('clearLogOnConvert'),
     preserveFolderStructure: chk('preserveFolderStructure'),
     customOutputPath: customPath,
     language: str('language'),

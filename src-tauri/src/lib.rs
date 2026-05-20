@@ -51,8 +51,8 @@ pub struct AppState {
 #[derive(Serialize)]
 struct ActivityData {
     cpu_percent: f64,
-    memory_used_mb: usize,
-    memory_peak_mb: usize,
+    memory_used_mb: f64,
+    memory_peak_mb: f64,
     memory_budget_mb: usize,
     is_network: bool,
     is_converting: bool,
@@ -536,8 +536,8 @@ fn get_activity_data(state: State<'_, AppState>) -> ActivityData {
         sys.refresh_processes(sysinfo::ProcessesToUpdate::Some(&[pid]), false);
         sys.process(pid).map(|p: &sysinfo::Process| p.cpu_usage() as f64).unwrap_or(0.0)
     };
-    let memory_used_mb = state.memory_used.load(Ordering::Relaxed) / (1024 * 1024);
-    let memory_peak_mb = state.memory_peak.load(Ordering::Relaxed) / (1024 * 1024);
+    let memory_used_mb = state.memory_used.load(Ordering::Relaxed) as f64 / 1048576.0;
+    let memory_peak_mb = state.memory_peak.load(Ordering::Relaxed) as f64 / 1048576.0;
     let memory_budget_mb = state.memory_budget_mb.load(Ordering::Relaxed);
     let is_network = state.is_network_conv.load(Ordering::Relaxed);
     let is_converting = state.is_converting.load(Ordering::SeqCst);

@@ -38,6 +38,24 @@ static PROGRESS_FILE_COUNTER: AtomicU64 = AtomicU64::new(0);
 
 const MAX_FILE_SIZE: u64 = 10 * 1024 * 1024 * 1024; // 10 GiB
 
+// Parse FFmpeg stderr 'time=HH:MM:SS.ms' and return progress ratio
+#[allow(dead_code)]
+fn parse_ffmpeg_time(time_str: &str, duration_secs: f64) -> Option<f64> {
+    if duration_secs <= 0.0 {
+        return None;
+    }
+    let time_str = time_str.trim();
+    let parts: Vec<&str> = time_str.split(':').collect();
+    if parts.len() != 3 {
+        return None;
+    }
+    let hours: f64 = parts[0].parse().ok()?;
+    let minutes: f64 = parts[1].parse().ok()?;
+    let secs: f64 = parts[2].parse().ok()?;
+    let total_secs = hours * 3600.0 + minutes * 60.0 + secs;
+    Some((total_secs / duration_secs).min(1.0))
+}
+
 // --- Single file conversion ---
 
 #[allow(clippy::too_many_arguments)]
@@ -91,6 +109,14 @@ async fn convert_one(
     let mut output_guard = OutputGuard { path: output.to_path_buf(), keep: false, backup: backup_path };
 
     let ffmpeg = ffmpeg_path();
+
+    // スローテスト環境変数: SLOW_TEST_THREADS で threads_per_job を上書き
+    let threads_per_job = if let Ok(threads_str) = std::env::var("SLOW_TEST_THREADS") {
+        threads_str.parse::<usize>().unwrap_or(threads_per_job).max(1)
+    } else {
+        threads_per_job
+    };
+
     // Input/output paths are added to cmd directly as OsStr (see below) to
     // support non-UTF-8 filenames. Only non-path args go in this Vec.
     let mut args: Vec<String> = vec![
@@ -164,6 +190,11 @@ async fn convert_one(
 
     args.extend(build_codec_args(format, settings, info));
 
+    // スローテスト環境変数: SLOW_TEST_REALTIME で -re フラグを追加
+    if std::env::var("SLOW_TEST_REALTIME").is_ok() {
+        args.push("-re".into());
+    }
+
     // Progress: Unix → stdout pipe; Windows → 一時ファイル経由
     // CREATE_NO_WINDOW 環境では pipe:1 が正しく動作しないため Windows のみ別方式を使用
     #[cfg(not(windows))]
@@ -226,6 +257,13 @@ async fn convert_one(
             }
             Ok(())
         });
+    }
+
+    // スローテスト環境変数: SLOW_TEST_DELAY_MS で変換開始を遅延
+    if let Ok(delay_str) = std::env::var("SLOW_TEST_DELAY_MS") {
+        if let Ok(delay_ms) = delay_str.parse::<u64>() {
+            tokio::time::sleep(tokio::time::Duration::from_millis(delay_ms)).await;
+        }
     }
 
     cmd.kill_on_drop(true);
