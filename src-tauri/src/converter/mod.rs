@@ -68,8 +68,8 @@ async fn convert_one(
     duration_secs: f64,
     threads_per_job: usize,
     input_bytes: Option<Vec<u8>>,
-    on_progress: impl Fn(f64) + Send,
-    on_pid: impl Fn(u32) + Send,
+    on_progress: Arc<dyn Fn(f64) + Send + Sync>,
+    on_pid: Arc<dyn Fn(u32) + Send + Sync>,
 ) -> Result<()> {
     // キャンセルやエラー時に不完全な出力ファイルを削除するガード
     // 上書きの場合は既存ファイルを一時ファイルに退避し、失敗時にリストア
@@ -288,11 +288,18 @@ async fn convert_one(
     }
 
     let stderr_task = child.stderr.take().map(|stderr| {
+        let on_progress = on_progress.clone();
         tokio::spawn(async move {
             let mut lines = BufReader::new(stderr).lines();
             let mut buf = Vec::new();
             while let Ok(Some(line)) = lines.next_line().await {
-                buf.push(line);
+                buf.push(line.clone());
+                // Parse 'time=HH:MM:SS.ms' for realtime progress update
+                if let Some(time_str) = line.strip_prefix("time=") {
+                    if let Some(progress) = parse_ffmpeg_time(time_str, duration_secs) {
+                        on_progress(progress);
+                    }
+                }
             }
             buf.join("\n")
         })
@@ -746,14 +753,12 @@ pub async fn run_conversion(
                 file_duration,
                 threads_per_job,
                 input_bytes,
-                move |ratio| { let _ = progress_tx.send(ratio); },
+                Arc::new(move |ratio| { let _ = progress_tx.send(ratio); }),
                 {
-                    // cancel_job が pid 登録より先に走ると ffmpeg を kill できなくなる。
-                    // std::sync::Mutex のため、即座に同期的に push する。
                     let pgids_for_pid = pgids_for_spawn.clone();
-                    move |pid| {
+                    Arc::new(move |pid| {
                         pgids_for_pid.lock().unwrap().push(pid as i32);
-                    }
+                    })
                 },
             )
             .await;
