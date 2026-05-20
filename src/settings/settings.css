@@ -416,3 +416,15 @@ input[type="checkbox"] {
   margin-top: 6px;
 }
 
+/* Network settings inline row (label and select side-by-side) */
+.field-row-inline {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px 12px;
+  align-items: center;
+}
+
+.field-row-inline label {
+  color: rgba(255, 255, 255, 0.7);
+}
+

@@ -52,20 +52,72 @@ fn run_silence_detect_raw(path: &Path, db: f64, min_dur_secs: f64) -> (Vec<(f64,
     parse_silence_regions_full(&stderr)
 }
 
+/// Detect silence regions from raw audio bytes via stdin.
+///
+/// Note: FFmpeg's auto-detect works poorly on pipe input, so `format_name`
+/// must be explicitly specified and accurate (e.g., "mp3", "flac", "aac").
+/// For container formats that require explicit codec (e.g., "matroska" → "aac"),
+/// bytes via stdin may fail silently if format_name doesn't match the actual codec.
+/// Returns empty regions and None on error (including format mismatch).
+fn run_silence_detect_from_bytes(
+    bytes: &[u8],
+    format_name: &str,
+    db: f64,
+    min_dur_secs: f64,
+) -> (Vec<(f64, f64)>, Option<f64>) {
+    let ffmpeg = ffmpeg_path();
+    let filter = format!("silencedetect=noise={db}dB:duration={min_dur_secs:.4}");
+    let mut cmd = std::process::Command::new(&ffmpeg);
+    cmd.args(["-f", format_name, "-i", "pipe:0"])
+       .args(["-af", &filter, "-f", "null", "-"])
+       .stdin(std::process::Stdio::piped())
+       .stderr(std::process::Stdio::piped());
+    #[cfg(windows)]
+    cmd.creation_flags(0x08000000); // CREATE_NO_WINDOW
+
+    let mut child = match cmd.spawn() {
+        Ok(c) => c,
+        Err(_) => return (vec![], None),
+    };
+    if let Some(mut stdin) = child.stdin.take() {
+        let _ = std::io::Write::write_all(&mut stdin, bytes);
+    }
+    let output = match child.wait_with_output() {
+        Ok(o) => o,
+        Err(_) => return (vec![], None),
+    };
+    parse_silence_regions_full(&String::from_utf8_lossy(&output.stderr))
+}
+
 /// Run FFmpeg silence detection on a file and return parsed regions
 /// (末尾未クローズ silence は含めない、互換 API)。
 pub fn run_silence_detect(path: &Path, db: f64, min_dur_secs: f64) -> Vec<(f64, f64)> {
     run_silence_detect_raw(path, db, min_dur_secs).0
 }
 
-/// Detect silence regions at the beginning and end of the file.
-/// Returns (has_start_silence, has_end_silence).
-/// 内部で FFmpeg を 1 回だけ実行し、末尾無音 (silence_end が来ないまま EOF) は
-/// `parse_silence_regions_full` の `unclosed_tail` から補完する。
-pub fn detect_boundary_silence(path: &Path, db: f64, min_dur_secs: f64, total_duration: f64) -> (bool, bool) {
-    let (mut all_regions, unclosed_tail) = run_silence_detect_raw(path, db, min_dur_secs);
+/// Detect silence at file boundaries (start/end).
+///
+/// When `bytes` is Some, silence detection uses the in-memory buffer via stdin,
+/// and `path` is ignored (bytes takes priority). This is used for network files
+/// that have already been buffered into memory.
+/// When `bytes` is None, `path` is used directly and `format_name` is ignored.
+/// `format_name` is only used and required when `bytes` is Some.
+pub fn detect_boundary_silence(
+    path: &Path,
+    bytes: Option<&[u8]>,
+    format_name: &str,
+    db: f64,
+    min_dur_secs: f64,
+    total_duration: f64,
+) -> (bool, bool) {
+    let (regions, detected_end) = if let Some(b) = bytes {
+        run_silence_detect_from_bytes(b, format_name, db, min_dur_secs)
+    } else {
+        run_silence_detect_raw(path, db, min_dur_secs)
+    };
+    let mut all_regions = regions;
 
-    if let Some(start) = unclosed_tail {
+    if let Some(start) = detected_end {
         all_regions.push((start, total_duration));
     }
 

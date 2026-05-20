@@ -154,7 +154,14 @@ async fn convert_one(
     if trim_enabled {
         let dur = settings.silence_trim_duration_ms as f64 / 1000.0;
         let db  = settings.silence_trim_db;
-        let (has_start, has_end) = detect_boundary_silence(input, db, dur, info.duration_secs);
+        let (has_start, has_end) = detect_boundary_silence(
+            input,
+            input_bytes.as_deref(),
+            &info.format_name,
+            db,
+            dur,
+            info.duration_secs,
+        );
 
         if has_start || has_end {
             let start_part = if has_start {
@@ -562,7 +569,6 @@ pub async fn run_conversion(
     let memory_budget = settings.max_memory_mb * 1024 * 1024;
     memory_used.store(0, Ordering::Relaxed); // 今回の変換開始時にリセット
     let memory_freed = Arc::new(tokio::sync::Notify::new());
-    let silence_trim_enabled = settings.silence_trim_enabled;
 
     // Stage 1 → Stage 2 チャンネル
     let (stage_tx, mut stage_rx) = tokio::sync::mpsc::channel::<(usize, PathBuf, FileInfo, Option<Vec<u8>>)>(cpu_parallel + 1);
@@ -613,8 +619,11 @@ pub async fn run_conversion(
                     }
                     s1_total_selected.fetch_add(1, Ordering::Relaxed);
 
-                    // ネットワーク時かつ silence trim 無効ならメモリにロードして stdin 経由で渡す
-                    let should_buffer = is_network && !silence_trim_enabled;
+                    // Network files are always buffered into memory, regardless of silence trim setting.
+                    // This allows silence_detect_from_bytes to access the same in-memory buffer,
+                    // eliminating duplicate NAS reads. Users can opt-out via backpressure (memory budget)
+                    // rather than a settings toggle.
+                    let should_buffer = is_network;
                     let bytes = if should_buffer {
                         let file_size = tokio::fs::metadata(&best.0).await
                             .map(|m| m.len() as usize).unwrap_or(0);
