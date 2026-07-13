@@ -1,0 +1,367 @@
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html, body {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: #1a1a2e;
+}
+
+/* SVG background fills entire window */
+#bg-container {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+#bg-container svg {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* UI overlay: pinned to bottom */
+#ui-overlay {
+  position: fixed;
+  bottom: 18px;
+  left: 0;
+  right: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  z-index: 10;
+}
+
+/* Toggle switch row */
+#toggle-area {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.toggle-label {
+  font-family: 'Arial', sans-serif;
+  font-size: 10px;
+  font-weight: bold;
+  color: rgba(255, 255, 255, 0.55);
+  letter-spacing: 0.08em;
+}
+
+.toggle-switch {
+  position: relative;
+  display: inline-block;
+  width: 36px;
+  height: 18px;
+  cursor: pointer;
+}
+
+.toggle-switch input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.slider {
+  position: absolute;
+  inset: 0;
+  background: rgba(255, 255, 255, 0.15);
+  border-radius: 18px;
+  transition: background 0.25s;
+}
+
+.slider::before {
+  content: '';
+  position: absolute;
+  width: 12px;
+  height: 12px;
+  left: 3px;
+  top: 3px;
+  background: rgba(255, 255, 255, 0.85);
+  border-radius: 50%;
+  transition: transform 0.25s;
+}
+
+input:checked + .slider {
+  background: rgba(255, 255, 255, 0.25);
+}
+
+input:checked + .slider::before {
+  transform: translateX(18px);
+}
+
+/* Format selector */
+#format-selector {
+  display: flex;
+  gap: 5px;
+}
+
+.fmt-btn,
+.decode-fmt-btn {
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 4px;
+  color: rgba(255, 255, 255, 0.5);
+  font-family: 'Arial', sans-serif;
+  font-size: 10px;
+  font-weight: bold;
+  letter-spacing: 0.05em;
+  padding: 3px 8px;
+  cursor: pointer;
+  transition: background 0.2s, color 0.2s, border-color 0.2s;
+}
+
+.fmt-btn:hover,
+.decode-fmt-btn:hover {
+  background: rgba(255, 255, 255, 0.14);
+  color: rgba(255, 255, 255, 0.8);
+}
+
+.fmt-btn.active,
+.decode-fmt-btn.active {
+  background: rgba(255, 255, 255, 0.18);
+  border-color: rgba(255, 255, 255, 0.4);
+  color: rgba(255, 255, 255, 0.95);
+}
+
+/* Context menu */
+#context-menu {
+  display: none;
+  position: fixed;
+  z-index: 1000;
+  background: rgba(28, 28, 35, 0.97);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 6px;
+  padding: 4px 0;
+  min-width: 140px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(8px);
+}
+
+.menu-item {
+  padding: 7px 14px;
+  font-family: 'Arial', sans-serif;
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.85);
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.menu-item:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.menu-separator {
+  height: 1px;
+  background: rgba(255, 255, 255, 0.1);
+  margin: 3px 0;
+}
+
+.menu-item-split {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.menu-toggle {
+  flex-shrink: 0;
+  width: 30px;
+  height: 17px;
+  border-radius: 9px;
+  border: none;
+  background: rgba(255, 255, 255, 0.2);
+  cursor: pointer;
+  position: relative;
+  transition: background 0.2s;
+  padding: 0;
+}
+
+.menu-toggle::after {
+  content: '';
+  position: absolute;
+  width: 13px;
+  height: 13px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.9);
+  top: 2px;
+  left: 2px;
+  transition: transform 0.2s;
+}
+
+.menu-toggle[aria-pressed="true"] {
+  background: #818cf8;
+}
+
+.menu-toggle[aria-pressed="true"]::after {
+  transform: translateX(13px);
+}
+
+/* Toast notification */
+.toast {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 500;
+  padding: 10px 20px;
+  border-radius: 8px;
+  font-family: 'Arial', sans-serif;
+  font-size: 13px;
+  font-weight: bold;
+  letter-spacing: 0.02em;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.25s;
+  white-space: pre-wrap;
+  max-width: 380px;
+  text-align: center;
+  line-height: 1.4;
+}
+
+.toast.visible {
+  opacity: 1;
+}
+
+.toast.success {
+  background: rgba(76, 175, 80, 0.92);
+  color: #fff;
+}
+
+.toast.error {
+  background: rgba(244, 67, 54, 0.92);
+  color: #fff;
+}
+
+.toast.warning {
+  background: rgba(255, 152, 0, 0.92);
+  color: #fff;
+}
+
+/* Pause dialog */
+.pause-dialog {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.55);
+  z-index: 2000;
+  backdrop-filter: blur(3px);
+}
+
+.pause-dialog.hidden {
+  display: none;
+}
+
+.pause-dialog-box {
+  background: rgba(22, 22, 42, 0.97);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 14px;
+  padding: 26px 28px 22px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  min-width: 210px;
+  text-align: center;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6);
+}
+
+.pause-dialog-msg {
+  color: rgba(255, 255, 255, 0.88);
+  font-family: 'Arial', sans-serif;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.pause-dialog-btns {
+  display: flex;
+  gap: 10px;
+}
+
+.pause-dialog-btns button {
+  flex: 1;
+  padding: 9px 0;
+  border-radius: 8px;
+  border: none;
+  font-family: 'Arial', sans-serif;
+  font-size: 12px;
+  font-weight: bold;
+  letter-spacing: 0.03em;
+  cursor: pointer;
+  transition: opacity 0.15s;
+}
+
+.pause-dialog-btns button:hover {
+  opacity: 0.85;
+}
+
+#btn-resume {
+  background: rgba(255, 255, 255, 0.15);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  color: rgba(255, 255, 255, 0.9);
+}
+
+#btn-cancel-job {
+  background: rgba(220, 55, 55, 0.75);
+  color: #fff;
+}
+
+#btn-quit-resume {
+  background: rgba(255, 255, 255, 0.15);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  color: rgba(255, 255, 255, 0.9);
+}
+
+#btn-quit-close {
+  background: #ef4444;
+  color: #fff;
+}
+
+.overwrite-dialog-box {
+  min-width: 260px;
+  max-width: 340px;
+}
+
+.overwrite-dialog-box .pause-dialog-btns {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+}
+
+#btn-overwrite-skip {
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  color: rgba(255, 255, 255, 0.8);
+}
+
+.overwrite-filename {
+  font-family: 'Arial', sans-serif;
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.55);
+  word-break: break-all;
+  margin: -12px 0 0;
+}
+
+#btn-overwrite-cancel {
+  background: #ef4444;
+  color: #fff;
+}
+
+#btn-overwrite-rename {
+  background: rgba(255, 255, 255, 0.15);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  color: rgba(255, 255, 255, 0.9);
+}
+
+#btn-overwrite-ok {
+  background: rgba(255, 255, 255, 0.15);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  color: rgba(255, 255, 255, 0.9);
+}

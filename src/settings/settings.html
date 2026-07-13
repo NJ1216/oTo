@@ -1,0 +1,356 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <script>try { document.documentElement.lang = localStorage.getItem('oto_lang') || 'ja'; } catch (_) {}</script>
+  <title data-i18n="window.settings">設定</title>
+  <link rel="stylesheet" href="/src/common.css" />
+  <link rel="stylesheet" href="/src/settings/settings.css" />
+</head>
+<body>
+  <div id="app">
+    <h1 data-i18n="settings.title">設定</h1>
+
+    <!-- 出力・ソース・競合 -->
+    <section class="section">
+      <div class="setting-grid">
+        <label data-i18n="settings.output.title">出力先フォルダ</label>
+        <div class="select-wrap">
+          <select id="outputDest">
+            <option value="source_folder" data-i18n="settings.output.source">元ファイルと同じフォルダ</option>
+            <option value="desktop" data-i18n="settings.output.desktop">デスクトップ</option>
+            <option value="downloads" data-i18n="settings.output.downloads">ダウンロード</option>
+            <option value="custom" data-i18n="settings.output.custom">指定フォルダ</option>
+          </select>
+        </div>
+        <div id="custom-path-row" class="full-row custom-path-row hidden">
+          <div id="custom-path-display" class="path-display"></div>
+          <button id="pick-folder-btn" class="small-btn" data-i18n="settings.output.pick">選択…</button>
+        </div>
+        <label id="preserve-structure-label" class="hidden" for="preserveFolderStructure" data-i18n="settings.output.preserveStructure">フォルダ構造を維持する</label>
+        <div id="preserve-structure-check" class="hidden">
+          <input type="checkbox" id="preserveFolderStructure" />
+        </div>
+
+        <label data-i18n="settings.source.title">元ファイルの扱い</label>
+        <div class="select-wrap">
+          <select id="sourceAction">
+            <option value="keep" data-i18n="settings.source.keep">保持（デフォルト）</option>
+            <option value="delete" data-i18n="settings.source.delete">変換後に削除</option>
+          </select>
+        </div>
+
+        <label data-i18n="settings.conflict.title">競合処理</label>
+        <div class="select-wrap">
+          <select id="nameConflict">
+            <option value="auto_rename" data-i18n="settings.conflict.rename">自動リネーム（デフォルト）</option>
+            <option value="confirm_dialog" data-i18n="settings.conflict.confirm">上書き確認</option>
+            <option value="force_overwrite" data-i18n="settings.conflict.overwrite">強制上書き</option>
+          </select>
+        </div>
+      </div>
+    </section>
+
+    <!-- 変換品質 -->
+    <section class="section">
+      <h2 data-i18n="settings.quality.title">変換品質</h2>
+      <div class="quality-grid">
+
+        <!-- MP3 -->
+        <label data-i18n="settings.quality.mp3.label">MP3 ビットレート</label>
+        <div class="select-wrap">
+          <select id="mp3Preset">
+            <option value="128" data-i18n="settings.quality.mp3.128">128 kbps</option>
+            <option value="192" data-i18n="settings.quality.mp3.192">192 kbps（デフォルト）</option>
+            <option value="256" data-i18n="settings.quality.mp3.256">256 kbps</option>
+            <option value="320" data-i18n="settings.quality.mp3.320">320 kbps</option>
+            <option value="custom" data-i18n="settings.quality.custom">カスタム…</option>
+          </select>
+        </div>
+        <div class="custom-detail" id="mp3Custom">
+          <div class="custom-inner">
+            <div class="full-row mode-row">
+              <label><input type="radio" name="mp3Mode" value="cbr" checked /> <span data-i18n="settings.custom.cbr">CBR</span></label>
+              <label><input type="radio" name="mp3Mode" value="vbr" /> <span data-i18n="settings.custom.vbr">VBR</span></label>
+            </div>
+            <div id="mp3CbrRows" class="full-row inner-grid">
+              <label data-i18n="settings.custom.bitrate">ビットレート (kbps)</label>
+              <div class="select-wrap">
+                <select id="mp3Bitrate">
+                  <option value="32">32 kbps</option>
+                  <option value="40">40 kbps</option>
+                  <option value="48">48 kbps</option>
+                  <option value="56">56 kbps</option>
+                  <option value="64">64 kbps</option>
+                  <option value="80">80 kbps</option>
+                  <option value="96">96 kbps</option>
+                  <option value="112">112 kbps</option>
+                  <option value="128">128 kbps</option>
+                  <option value="160">160 kbps</option>
+                  <option value="192">192 kbps</option>
+                  <option value="224">224 kbps</option>
+                  <option value="256">256 kbps</option>
+                  <option value="320">320 kbps</option>
+                </select>
+              </div>
+            </div>
+            <div id="mp3VbrRows" class="full-row inner-grid" style="display:none">
+              <label data-i18n="settings.custom.vbrQuality">VBR Quality</label>
+              <div class="select-wrap">
+                <select id="mp3VbrQuality">
+                  <option value="0">V0 (best)</option>
+                  <option value="1">V1</option>
+                  <option value="2">V2</option>
+                  <option value="3">V3</option>
+                  <option value="4">V4</option>
+                  <option value="5">V5</option>
+                  <option value="6">V6</option>
+                  <option value="7">V7</option>
+                  <option value="8">V8</option>
+                  <option value="9">V9 (smallest)</option>
+                </select>
+              </div>
+            </div>
+            <label data-i18n="settings.custom.sampleRate">サンプルレート</label>
+            <div class="select-wrap">
+              <select id="mp3SampleRate">
+                <option value="0" data-i18n="settings.custom.auto">自動</option>
+                <option value="44100">44.1 kHz</option>
+                <option value="48000">48 kHz</option>
+                <option value="88200">88.2 kHz</option>
+                <option value="96000">96 kHz</option>
+              </select>
+            </div>
+            <label data-i18n="settings.custom.channel">チャンネル</label>
+            <div class="select-wrap">
+              <select id="mp3ChannelMode">
+                <option value="auto" data-i18n="settings.custom.auto">自動</option>
+                <option value="joint_stereo" data-i18n="settings.custom.jointStereo">Joint Stereo</option>
+                <option value="stereo" data-i18n="settings.custom.stereo">Stereo</option>
+                <option value="mono" data-i18n="settings.custom.mono">Mono</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <!-- AAC -->
+        <label data-i18n="settings.quality.aac.label">AAC ビットレート</label>
+        <div class="select-wrap">
+          <select id="aacPreset">
+            <option value="96"  data-i18n="settings.quality.aac.96">96 kbps</option>
+            <option value="128" data-i18n="settings.quality.aac.128">128 kbps（デフォルト）</option>
+            <option value="192" data-i18n="settings.quality.aac.192">192 kbps</option>
+            <option value="256" data-i18n="settings.quality.aac.256">256 kbps</option>
+            <option value="custom" data-i18n="settings.quality.custom">カスタム…</option>
+          </select>
+        </div>
+        <div class="custom-detail" id="aacCustom">
+          <div class="custom-inner">
+            <!-- FFmpeg ビルトイン aac は VBR 非対応 (libfdk_aac 専用) のため CBR のみ提供 -->
+            <div id="aacCbrRows" class="full-row inner-grid">
+              <label data-i18n="settings.custom.bitrate">ビットレート (kbps)</label>
+              <div class="select-wrap">
+                <select id="m4aBitrate">
+                  <option value="32">32 kbps</option>
+                  <option value="48">48 kbps</option>
+                  <option value="64">64 kbps</option>
+                  <option value="80">80 kbps</option>
+                  <option value="96">96 kbps</option>
+                  <option value="112">112 kbps</option>
+                  <option value="128">128 kbps</option>
+                  <option value="160">160 kbps</option>
+                  <option value="192">192 kbps</option>
+                  <option value="224">224 kbps</option>
+                  <option value="256">256 kbps</option>
+                  <option value="320">320 kbps</option>
+                </select>
+              </div>
+            </div>
+            <label data-i18n="settings.custom.sampleRate">サンプルレート</label>
+            <div class="select-wrap">
+              <select id="aacSampleRate">
+                <option value="0"     data-i18n="settings.custom.auto">自動</option>
+                <option value="44100">44.1 kHz</option>
+                <option value="48000">48 kHz</option>
+              </select>
+            </div>
+            <label data-i18n="settings.custom.channel">チャンネル</label>
+            <div class="select-wrap">
+              <select id="aacChannels">
+                <option value="0" data-i18n="settings.custom.auto">自動</option>
+                <option value="2" data-i18n="settings.custom.stereo">Stereo</option>
+                <option value="1" data-i18n="settings.custom.mono">Mono</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <!-- OPUS -->
+        <label data-i18n="settings.quality.opus.label">OPUS ビットレート</label>
+        <div class="select-wrap">
+          <select id="opusPreset">
+            <option value="64"  data-i18n="settings.quality.opus.64">64 kbps</option>
+            <option value="96"  data-i18n="settings.quality.opus.96">96 kbps</option>
+            <option value="128" data-i18n="settings.quality.opus.128">128 kbps（デフォルト）</option>
+            <option value="192" data-i18n="settings.quality.opus.192">192 kbps</option>
+            <option value="custom" data-i18n="settings.quality.custom">カスタム…</option>
+          </select>
+        </div>
+        <div class="custom-detail" id="opusCustom">
+          <div class="custom-inner">
+            <div class="full-row mode-row">
+              <label><input type="radio" name="opusMode" value="vbr" checked /> <span data-i18n="settings.custom.vbr">VBR</span></label>
+              <label><input type="radio" name="opusMode" value="cbr" /> <span data-i18n="settings.custom.cbr">CBR</span></label>
+            </div>
+            <label data-i18n="settings.custom.bitrate">ビットレート (kbps)</label>
+            <div class="select-wrap">
+              <select id="opusBitrate">
+                <option value="16">16 kbps</option>
+                <option value="24">24 kbps</option>
+                <option value="32">32 kbps</option>
+                <option value="48">48 kbps</option>
+                <option value="64">64 kbps</option>
+                <option value="80">80 kbps</option>
+                <option value="96">96 kbps</option>
+                <option value="128">128 kbps</option>
+                <option value="160">160 kbps</option>
+                <option value="192">192 kbps</option>
+                <option value="256">256 kbps</option>
+                <option value="320">320 kbps</option>
+              </select>
+            </div>
+            <label data-i18n="settings.custom.opusComplexity">複雑度 (0–10)</label>
+            <div class="select-wrap">
+              <select id="opusComplexity">
+                <option value="0">0</option>
+                <option value="1">1</option>
+                <option value="2">2</option>
+                <option value="3">3</option>
+                <option value="4">4</option>
+                <option value="5">5</option>
+                <option value="6">6</option>
+                <option value="7">7</option>
+                <option value="8">8</option>
+                <option value="9">9</option>
+                <option value="10">10</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <!-- FLAC -->
+        <label data-i18n="settings.quality.flac.label">FLAC 圧縮レベル</label>
+        <div class="select-wrap">
+          <select id="flacPreset">
+            <option value="0" data-i18n="settings.quality.flac.0">0（最速）</option>
+            <option value="3" data-i18n="settings.quality.flac.3">3</option>
+            <option value="5" data-i18n="settings.quality.flac.5">5（デフォルト）</option>
+            <option value="8" data-i18n="settings.quality.flac.8">8（最高圧縮）</option>
+            <option value="custom" data-i18n="settings.quality.custom">カスタム…</option>
+          </select>
+        </div>
+        <div class="custom-detail" id="flacCustom">
+          <div class="custom-inner">
+            <label data-i18n="settings.custom.flacLevel">圧縮レベル (0–8)</label>
+            <input type="number" id="flacCompression" min="0" max="8" value="5" />
+          </div>
+        </div>
+
+        <!-- ALAC -->
+        <label data-i18n="settings.quality.alac.label">ALAC</label>
+        <div class="select-wrap">
+          <select id="alacPreset">
+            <option value="" data-i18n="settings.quality.alac.default">標準（ロスレス）</option>
+            <option value="custom" data-i18n="settings.quality.custom">カスタム…</option>
+          </select>
+        </div>
+        <div class="custom-detail" id="alacCustom">
+          <div class="custom-inner">
+            <label data-i18n="settings.custom.bitDepth">ビット深度</label>
+            <div class="select-wrap">
+              <select id="alacBitDepth">
+                <option value="16">16 bit</option>
+                <option value="24">24 bit</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- 無音トリミング -->
+    <section class="section">
+      <h2 data-i18n="settings.silenceTrim.title">無音トリミング</h2>
+      <div class="silence-main-row">
+        <label class="checkbox-row toggle-row">
+          <div class="toggle-label-text">
+            <span data-i18n="settings.silenceTrim.enable">先頭と末尾の無音を削除</span>
+          </div>
+          <div class="toggle-switch-wrap">
+            <input type="checkbox" id="silenceTrimEnabled" />
+            <span class="toggle-pill"></span>
+          </div>
+        </label>
+        <button id="open-preview-btn" class="small-btn" data-i18n="settings.silenceTrim.detail">詳細設定…</button>
+      </div>
+    </section>
+
+    <!-- 表示フォーマット -->
+    <section class="section">
+      <h2 data-i18n="settings.formats.title">表示フォーマット</h2>
+      <p class="format-sub-label" data-i18n="settings.formats.encode">エンコード</p>
+      <div class="format-btn-group" id="encode-fmt-group">
+        <button class="fmt-toggle-btn" data-fmt="mp3" aria-pressed="false">MP3</button>
+        <button class="fmt-toggle-btn" data-fmt="aac" aria-pressed="false">AAC</button>
+        <button class="fmt-toggle-btn" data-fmt="opus" aria-pressed="false">OPUS</button>
+        <button class="fmt-toggle-btn" data-fmt="flac" aria-pressed="false">FLAC</button>
+        <button class="fmt-toggle-btn" data-fmt="alac" aria-pressed="false">ALAC</button>
+      </div>
+      <p class="format-sub-label" data-i18n="settings.formats.decode">デコード</p>
+      <div class="format-btn-group" id="decode-fmt-group">
+        <button class="fmt-toggle-btn decode-toggle-btn" data-fmt="wav" aria-pressed="false">WAV</button>
+        <button class="fmt-toggle-btn decode-toggle-btn" data-fmt="aiff" aria-pressed="false">AIFF</button>
+      </div>
+      <p class="format-hint" data-i18n="settings.formats.hint">メインウィンドウに表示する変換形式を選択（最低1つ必要）</p>
+    </section>
+
+    <!-- その他 -->
+    <section class="section">
+      <h2 data-i18n="settings.misc.title">その他</h2>
+      <label class="checkbox-row">
+        <input type="checkbox" id="openInFinder" />
+        <span data-i18n="settings.misc.reveal">変換完了後に出力先を開く</span>
+      </label>
+      <label class="checkbox-row">
+        <input type="checkbox" id="clearLogOnConvert" />
+        <span data-i18n="settings.misc.clearLogOnConvert">変換時にログをクリアする</span>
+      </label>
+      <label class="checkbox-row">
+        <input type="checkbox" id="autoOpenActivity" />
+        <span data-i18n="settings.misc.autoOpenActivity">変換開始時にアクティビティを自動表示</span>
+      </label>
+      <label class="checkbox-row">
+        <input type="checkbox" id="exportAllAudioTracks" />
+        <span data-i18n="settings.misc.exportAllAudioTracks">映像の音声トラックを全て出力</span>
+      </label>
+    </section>
+
+    <!-- 言語 -->
+    <section class="section">
+      <h2 data-i18n="settings.lang.title">言語</h2>
+      <div class="select-wrap">
+        <select id="language">
+          <option value="" data-i18n="settings.lang.auto">システム設定に従う</option>
+          <option value="ja" data-i18n="settings.lang.ja">日本語</option>
+          <option value="en" data-i18n="settings.lang.en">English</option>
+        </select>
+      </div>
+    </section>
+
+  </div>
+
+  <script type="module" src="/src/settings/settings.js"></script>
+</body>
+</html>

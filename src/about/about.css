@@ -1,0 +1,231 @@
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  background: #1e1e2e;
+  color: rgba(255, 255, 255, 0.88);
+  font-family: -apple-system, 'Arial', sans-serif;
+  font-size: 13px;
+  overflow: hidden;
+}
+
+#app {
+  padding: 22px 22px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  height: 100vh;
+}
+
+#header {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+#icon-wrap {
+  width: 56px;
+  height: 56px;
+  flex-shrink: 0;
+}
+
+#app-icon {
+  width: 100%;
+  height: 100%;
+}
+
+#title-block {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+h1 {
+  font-size: 22px;
+  font-weight: 700;
+  color: #fff;
+}
+
+#subtitle {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.45);
+}
+
+#version-text {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.5);
+  font-family: 'Menlo', monospace;
+}
+
+#author {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.4);
+}
+
+h2 {
+  font-size: 11px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.4);
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+}
+
+/* --- Library list --- */
+
+#lib-list {
+  flex: 1;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+}
+
+#lib-list::-webkit-scrollbar {
+  width: 4px;
+}
+
+#lib-list::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+#lib-list::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.18);
+  border-radius: 2px;
+}
+
+.lib-section-header {
+  font-size: 10px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.35);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  padding: 12px 0 5px;
+}
+
+.lib-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 4px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+}
+
+.lib-row:last-child {
+  border-bottom: none;
+}
+
+.lib-name {
+  font-family: 'Menlo', monospace;
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.85);
+}
+
+.lib-text {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.lib-detail {
+  color: rgba(255, 255, 255, 0.42);
+  font-size: 10px;
+}
+
+.lib-badge {
+  font-family: 'Menlo', monospace;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 3px 10px;
+  border-radius: 5px;
+  white-space: nowrap;
+}
+
+.badge-mit {
+  background: #1a4731;
+  color: #4ade80;
+}
+
+.badge-external {
+  background: #1a3344;
+  color: #7dd3fc;
+}
+
+.licenses-btn {
+  width: 100%;
+  border: 1px solid rgba(125, 211, 252, 0.28);
+  border-radius: 8px;
+  padding: 9px 12px;
+  color: #bae6fd;
+  background: rgba(14, 116, 144, 0.16);
+  font-size: 12px;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+  flex-shrink: 0;
+}
+
+.licenses-btn:hover {
+  background: rgba(14, 116, 144, 0.3);
+  border-color: rgba(125, 211, 252, 0.5);
+}
+
+.badge-apache {
+  background: #2e1e4a;
+  color: #a78bfa;
+}
+
+.badge-other {
+  background: #3a2e14;
+  color: #fbbf24;
+}
+
+/* --- Close button --- */
+
+#close-btn {
+  align-self: center;
+  width: 58%;
+  background: rgba(255, 255, 255, 0.1);
+  border: none;
+  border-radius: 8px;
+  color: rgba(255, 255, 255, 0.8);
+  font-size: 14px;
+  padding: 10px 0;
+  cursor: pointer;
+  transition: background 0.15s;
+  flex-shrink: 0;
+}
+
+#close-btn:hover {
+  background: rgba(255, 255, 255, 0.18);
+}
+
+/* --- GitHub link --- */
+
+#github-link {
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.38);
+  text-decoration: none;
+  cursor: pointer;
+  transition: color 0.15s;
+}
+
+#github-link:hover {
+  color: rgba(255, 255, 255, 0.75);
+  text-decoration: underline;
+}
+
+/* --- Clickable lib rows --- */
+
+.lib-row-link {
+  cursor: pointer;
+  transition: background 0.12s;
+  border-radius: 5px;
+  padding-left: 4px;
+  padding-right: 4px;
+}
+
+.lib-row-link:hover {
+  background: rgba(255, 255, 255, 0.07);
+}
