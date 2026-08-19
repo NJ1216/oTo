@@ -16,7 +16,9 @@ use std::path::{Path, PathBuf};
 use std::process::Stdio;
 use std::sync::Arc;
 use tauri::{AppHandle, Emitter, Manager};
-use tokio::io::{AsyncBufReadExt, AsyncReadExt, AsyncWriteExt, BufReader};
+use tokio::io::{AsyncReadExt, AsyncWriteExt};
+#[cfg(not(windows))]
+use tokio::io::{AsyncBufReadExt, BufReader};
 use tokio::sync::{Notify, Semaphore};
 use tokio::task::JoinSet;
 
@@ -519,6 +521,16 @@ fn paths_refer_to_same_file(input: &Path, output: &Path) -> bool {
 
 /// 同一パスへの再エンコード用。旧ファイルは、完成した一時出力を置換できる時点まで残す。
 fn replace_file_after_success(temp_output: &Path, output: &Path) -> Result<()> {
+    // 新規出力では退避する旧ファイルがない。特にネットワーク出力はローカルの
+    // スプールから一意なアップロード用ファイルを作ってここへ来るため、通常はこの
+    // 経路になる。存在しない完成パスを rename しようとすると Samba 共有では
+    // NotFound となり、変換済みのファイルを確定できなかった。
+    if !output.exists() {
+        std::fs::rename(temp_output, output)
+            .map_err(|e| anyhow!("failed to finalize converted output: {}", e))?;
+        return Ok(());
+    }
+
     let backup = unique_sibling_path(output, ".oto-replace-backup", false);
     std::fs::rename(output, &backup)
         .map_err(|e| anyhow!("failed to preserve original before replacement: {}", e))?;
@@ -2237,6 +2249,21 @@ mod network_tests {
 
         assert_eq!(std::fs::read(&output).unwrap(), b"converted");
         assert!(!temp_output.exists());
+        std::fs::remove_dir_all(dir).unwrap();
+    }
+
+    #[test]
+    fn finalizing_a_new_output_does_not_require_an_existing_destination() {
+        let dir = std::env::temp_dir().join(format!("oto-finalize-test-{}", uuid::Uuid::new_v4()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let output = dir.join("song.mp3");
+        let uploaded = dir.join(".oto-upload-test.mp3");
+        std::fs::write(&uploaded, b"converted").unwrap();
+
+        replace_file_after_success(&uploaded, &output).unwrap();
+
+        assert_eq!(std::fs::read(&output).unwrap(), b"converted");
+        assert!(!uploaded.exists());
         std::fs::remove_dir_all(dir).unwrap();
     }
 

@@ -42,7 +42,6 @@ pub fn configure_ffmpeg_command(command: &mut tokio::process::Command) {
     command.kill_on_drop(true);
     #[cfg(windows)]
     {
-        use std::os::windows::process::CommandExt;
         command.creation_flags(0x08000000);
     }
     #[cfg(unix)]

@@ -1,5 +1,9 @@
 const SUPPORTED = ['ja', 'en'];
 let _dict = {};
+const LOCALE_LOADERS = {
+  ja: () => import('./ja.js'),
+  en: () => import('./en.js'),
+};
 
 function resolve(lang) {
   if (lang && SUPPORTED.includes(lang)) return lang;
@@ -33,7 +37,8 @@ function applyDOM() {
 
 export async function initI18n(lang) {
   const resolved = resolve(lang);
-  const mod = await import(`./${resolved}.js`);
+  const loader = LOCALE_LOADERS[resolved] || LOCALE_LOADERS.ja;
+  const mod = await loader();
   _dict = mod.default;
   document.documentElement.lang = resolved;
   try { localStorage.setItem('oto_lang', resolved); } catch (_) {}
