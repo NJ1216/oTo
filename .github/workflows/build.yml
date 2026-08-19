@@ -79,6 +79,9 @@ jobs:
         run: cargo clippy -- -D warnings
         working-directory: src-tauri
 
+      - name: Rust 依存関係の事前取得
+        run: cargo fetch --locked --manifest-path src-tauri/Cargo.toml
+
       - name: 第三者ライセンス通知の同期チェック
         run: |
           pnpm licenses:generate
