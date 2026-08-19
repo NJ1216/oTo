@@ -1,6 +1,6 @@
 [package]
 name = "oto"
-version = "26.7.13"
+version = "26.8.19"
 description = "oTo - Audio Converter"
 authors = ["NJSoftware"]
 license = "MIT"
