@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <!-- HTML-1: lang updated to match saved preference before JS runs -->
+  <script>try { document.documentElement.lang = localStorage.getItem('oto_lang') || 'ja'; } catch (_) {}</script>
+  <!-- HTML-2: data-i18n so applyDOM() keeps title in sync -->
+  <title data-i18n="window.main">oTo</title>
+  <link rel="stylesheet" href="/src/common.css" />
+  <link rel="stylesheet" href="/src/style.css" />
+</head>
+<body>
+  <!-- SVG background (filled by svg-controller.js) -->
+  <div id="bg-container"></div>
+
+  <!-- UI overlay -->
+  <div id="ui-overlay">
+    <!-- Format selector -->
+    <div id="format-selector">
+      <!-- ENCODE formats: 非可逆(MP3/AAC/OPUS) → 可逆(FLAC/ALAC) -->
+      <button class="fmt-btn active" data-fmt="mp3" aria-pressed="true">MP3</button>
+      <button class="fmt-btn" data-fmt="aac" aria-pressed="false">AAC</button>
+      <button class="fmt-btn" data-fmt="opus" aria-pressed="false">OPUS</button>
+      <button class="fmt-btn" data-fmt="flac" aria-pressed="false">FLAC</button>
+      <button class="fmt-btn" data-fmt="alac" aria-pressed="false">ALAC</button>
+      <!-- DECODE formats -->
+      <button class="decode-fmt-btn active" data-fmt="wav" aria-pressed="true">WAV</button>
+      <button class="decode-fmt-btn" data-fmt="aiff" aria-pressed="false">AIFF</button>
+    </div>
+
+    <!-- Mode toggle: encode / decode -->
+    <div id="toggle-area">
+      <span class="toggle-label">ENCODE</span>
+      <label class="toggle-switch">
+        <input type="checkbox" id="mode-toggle" aria-label="ENCODE / DECODE" />
+        <span class="slider"></span>
+      </label>
+      <span class="toggle-label">DECODE</span>
+    </div>
+  </div>
+
+  <!-- Context menu -->
+  <div id="context-menu">
+    <div class="menu-item" id="menu-settings" data-i18n="menu.settings">設定</div>
+    <div class="menu-item menu-item-split" id="menu-silence-detail">
+      <span data-i18n="menu.silenceTrimDetail">無音トリミング</span>
+      <button class="menu-toggle" id="menu-silence-toggle" aria-pressed="false"></button>
+    </div>
+    <div class="menu-item menu-item-split" id="menu-activity">
+      <span data-i18n="menu.activity">アクティビティ</span>
+      <button class="menu-toggle" id="menu-activity-toggle" aria-pressed="false"></button>
+    </div>
+    <div class="menu-separator"></div>
+    <div class="menu-item" id="menu-about" data-i18n="menu.about">バージョン情報</div>
+  </div>
+
+  <!-- Pause dialog -->
+  <div id="pause-dialog" class="pause-dialog hidden">
+    <div class="pause-dialog-box">
+      <p class="pause-dialog-msg" data-i18n="dialog.pauseMsg">変換を一時停止しました</p>
+      <div class="pause-dialog-btns">
+        <button id="btn-resume" data-i18n="dialog.resume">続ける</button>
+        <button id="btn-cancel-job" data-i18n="dialog.cancelJob">中止する</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Overwrite confirm dialog -->
+  <div id="overwrite-dialog" class="pause-dialog hidden">
+    <div class="pause-dialog-box overwrite-dialog-box">
+      <p class="pause-dialog-msg" data-i18n="dialog.overwriteMsg">このファイルはすでに存在します。</p>
+      <p id="overwrite-filename" class="overwrite-filename"></p>
+      <div class="pause-dialog-btns">
+        <button id="btn-overwrite-cancel" data-i18n="dialog.overwriteCancel">中止</button>
+        <button id="btn-overwrite-skip" data-i18n="dialog.overwriteSkip">スキップ</button>
+        <button id="btn-overwrite-rename" data-i18n="dialog.overwriteRename">別名保存</button>
+        <button id="btn-overwrite-ok" data-i18n="dialog.overwriteOk">上書き</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Quit confirm dialog (Cmd+Q during conversion) -->
+  <div id="quit-confirm-dialog" class="pause-dialog hidden">
+    <div class="pause-dialog-box">
+      <p class="pause-dialog-msg" data-i18n="dialog.quitMsg">変換中です。アプリを閉じますか？</p>
+      <div class="pause-dialog-btns">
+        <button id="btn-quit-resume" data-i18n="dialog.continueConvert">変換を続ける</button>
+        <button id="btn-quit-close" data-i18n="dialog.quitAndClose">閉じる</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast notification -->
+  <div id="toast" class="toast"></div>
+
+  <script type="module" src="/src/main.js"></script>
+</body>
+</html>

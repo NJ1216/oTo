@@ -1,0 +1,50 @@
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Claude Code
+.claude/
+
+# Node.js
+node_modules/
+
+# Rust / Tauri build output
+src-tauri/target/
+
+# Sidecar binaries (platform-specific executables)
+src-tauri/binaries/
+
+# Environment
+.env
+.env.local
+.env.*
+!.env.example
+
+# Logs
+*.log
+logs/
+
+# Test and coverage output
+coverage/
+test-results/
+playwright-report/
+
+# Caches and temporary files
+.cache/
+.tmp/
+tmp/
+*.tmp
+
+# Credentials and signing material
+*.pem
+*.key
+*.p12
+*.pfx
+
+# Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+dist/
