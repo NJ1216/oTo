@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <script>try { document.documentElement.lang = localStorage.getItem('oto_lang') || 'ja'; } catch (_) {}</script>
+  <title data-i18n="activity.title">アクティビティ</title>
+  <link rel="stylesheet" href="/src/common.css" />
+  <link rel="stylesheet" href="/src/activity/activity.css" />
+</head>
+<body>
+  <div id="app">
+    <h1 class="section-title" data-i18n="activity.title">アクティビティ</h1>
+
+    <!-- 1段目: システム・スプール状態 -->
+    <section id="status-strip" aria-label="Status">
+      <div class="status-item" id="cpu-status">
+        <div class="metric-label" data-i18n="activity.cpu">システム CPU</div>
+        <div class="status-value" id="cpu-value">—</div>
+        <div class="metric-bar-track"><div class="metric-bar" id="cpu-bar"></div></div>
+      </div>
+      <div class="status-item" id="input-spool-status">
+        <div class="metric-label" data-i18n="activity.inputSpool">入力スプール</div>
+        <div class="status-value" id="input-spool-value">—</div>
+        <div class="metric-bar-track"><div class="metric-bar" id="input-spool-bar"></div></div>
+        <div class="status-hint" id="input-spool-hint"></div>
+      </div>
+      <div class="status-item" id="output-spool-status">
+        <div class="metric-label" data-i18n="activity.outputSpool">出力スプール</div>
+        <div class="status-value" id="output-spool-value">—</div>
+        <div class="status-hint" id="output-spool-hint"></div>
+      </div>
+    </section>
+
+    <!-- 2段目: 全工程進捗 -->
+    <section id="overall-progress">
+      <div class="overall-heading">
+        <span class="metric-label" data-i18n="activity.overallProgress">全工程進捗</span>
+        <span id="overall-percent">0.0%</span>
+      </div>
+      <div class="overall-progress-track" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+        <div id="overall-progress-bar"></div>
+      </div>
+      <div class="progress-details">
+        <div class="progress-detail">
+          <span class="detail-label" data-i18n="activity.completedFiles">完了ファイル</span>
+          <span class="detail-value" id="completed-value">0 / 0</span>
+        </div>
+        <div class="progress-detail">
+          <span class="detail-label" data-i18n="activity.elapsed">経過時間</span>
+          <span class="detail-value" id="elapsed-value">—</span>
+        </div>
+        <div class="progress-detail">
+          <span class="detail-label" data-i18n="activity.remaining">推定残り</span>
+          <span class="detail-value" id="eta-value">—</span>
+        </div>
+      </div>
+      <div id="queue-counts" class="queue-counts">
+        <span><span data-i18n="activity.queueBatches">バッチ</span> <strong id="queue-batches-value">0</strong></span>
+        <span><span data-i18n="activity.queueWaiting">待機</span> <strong id="queue-waiting-value">0</strong></span>
+        <span><span data-i18n="activity.queueProcessing">処理中</span> <strong id="queue-processing-value">0</strong></span>
+        <span><span data-i18n="activity.queueDone">完了</span> <strong id="queue-done-value">0</strong></span>
+        <span><span data-i18n="activity.queueSkipped">スキップ</span> <strong id="queue-skipped-value">0</strong></span>
+        <span><span data-i18n="activity.queueFailed">失敗</span> <strong id="queue-failed-value">0</strong></span>
+      </div>
+    </section>
+
+    <!-- 変換ログ -->
+    <div class="log-header">
+      <span data-i18n="activity.log">変換ログ</span>
+      <button id="clear-btn" data-i18n="activity.clear">クリア</button>
+    </div>
+    <div id="log-list">
+      <div id="log-empty" class="log-empty" data-i18n="activity.logEmpty">変換が開始されると、ここにログが表示されます</div>
+    </div>
+  </div>
+
+  <div id="log-copy-menu" class="log-copy-menu hidden" role="menu">
+    <button id="btn-copy-log-error" role="menuitem" data-i18n="activity.copyErrorDetails">詳細をコピー</button>
+  </div>
+
+  <script type="module" src="/src/activity/activity.js"></script>
+</body>
+</html>
