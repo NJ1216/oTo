@@ -87,9 +87,9 @@ wingetを利用できない場合は、[FFmpeg公式ダウンロードページ]
 
 自分の環境でoToをビルドする場合は、先に次のツールを用意してください。
 
-- [Node.js](https://nodejs.org/) 22以降
-- [pnpm](https://pnpm.io/installation)
-- [Rust](https://www.rust-lang.org/tools/install) stable
+- [Node.js](https://nodejs.org/) 22.12以降（最新のLTS版を推奨）
+- [pnpm](https://pnpm.io/installation)（最新版を推奨）
+- [Rust](https://www.rust-lang.org/tools/install) の最新の安定版（`rustup update stable` で更新できます）
 - OSごとの[Tauri 2 prerequisites](https://v2.tauri.app/start/prerequisites/)
 
 リポジトリを取得し、依存関係をインストールしてからproduction buildを実行します。
@@ -189,9 +189,9 @@ Adjust the detection level and minimum silence duration while viewing the wavefo
 
 To build oTo locally, install the following prerequisites first:
 
-- [Node.js](https://nodejs.org/) 22 or later
-- [pnpm](https://pnpm.io/installation)
-- [Rust](https://www.rust-lang.org/tools/install) stable
+- [Node.js](https://nodejs.org/) 22.12 or later (the latest LTS is recommended)
+- [pnpm](https://pnpm.io/installation) (the latest release is recommended)
+- The latest stable [Rust](https://www.rust-lang.org/tools/install) (update with `rustup update stable`)
 - The [Tauri 2 prerequisites](https://v2.tauri.app/start/prerequisites/) for your operating system
 
 Clone the repository, install locked dependencies, and create a production build:
