@@ -1,0 +1,25 @@
+/* CSS-3: Design tokens shared across all windows */
+:root {
+  --bg-primary: #1a1a2e;
+  --bg-secondary: #1e1e2e;
+  --bg-input: #262637;
+  --text-primary: rgba(255, 255, 255, 0.88);
+  --text-secondary: rgba(255, 255, 255, 0.6);
+  --text-muted: rgba(255, 255, 255, 0.35);
+  --accent: rgba(99, 102, 241, 0.85);
+  --accent-hover: rgba(99, 102, 241, 1);
+  --border: rgba(255, 255, 255, 0.12);
+}
+
+/* CSS-4: Prevent text selection in all windows */
+* {
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+/* CSS-2: Single authoritative definition of .hidden.
+   !important is intentional: utility classes must beat element-specific display values
+   (e.g. .waveform-loading has display:flex, .custom-path-row has display:flex). */
+.hidden {
+  display: none !important;
+}

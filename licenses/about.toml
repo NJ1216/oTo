@@ -1,0 +1,13 @@
+accepted = [
+  "MIT",
+  "Apache-2.0",
+  "BSD-3-Clause",
+  "Zlib",
+  "Unicode-3.0",
+  "MPL-2.0",
+]
+
+targets = [
+  "aarch64-apple-darwin",
+  "x86_64-pc-windows-msvc",
+]
